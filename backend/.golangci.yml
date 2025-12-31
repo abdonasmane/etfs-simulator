@@ -1,0 +1,25 @@
+run:
+  timeout: 3m
+  tests: true
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosimple
+    - gofmt
+    - goimports
+    - revive
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/abdonasmane/etfs-simulator/backend
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
