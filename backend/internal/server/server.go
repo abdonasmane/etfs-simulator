@@ -4,7 +4,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
 )
 
 // Server wraps an HTTP server with graceful shutdown capabilities.
@@ -70,7 +71,7 @@ func (s *Server) Run(ctx context.Context) error {
 		slog.Info("starting HTTP server",
 			slog.String("addr", s.httpServer.Addr),
 		)
-		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.httpServer.ListenAndServe(); errors.Check(err) && !errors.Is(err, http.ErrServerClosed) {
 			serverErrors <- err
 		}
 	}()
@@ -106,7 +107,7 @@ func (s *Server) shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
 	defer cancel()
 
-	if err := s.httpServer.Shutdown(ctx); err != nil {
+	if err := s.httpServer.Shutdown(ctx); errors.Check(err) {
 		return fmt.Errorf("graceful shutdown failed: %w", err)
 	}
 

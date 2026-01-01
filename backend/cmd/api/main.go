@@ -1,5 +1,13 @@
 // Package main is the entry point for the ETFs Simulator API server.
-// It wires together all dependencies and starts the HTTP server.
+//
+//	@title			ETFs Simulator API
+//	@version		1.0
+//	@description	Simple investment growth simulator
+//	@host			localhost:8080
+//	@BasePath		/
+//	@schemes		http
+//	@produce		json
+//	@consumes		json
 package main
 
 import (
@@ -22,14 +30,6 @@ func main() {
 }
 
 // run initializes and runs the application.
-// It returns an error if any component fails to initialize or if the server
-// encounters an unrecoverable error.
-//
-// The function follows this initialization order:
-//  1. Load configuration from environment
-//  2. Initialize structured logger
-//  3. Create HTTP handlers
-//  4. Start HTTP server with graceful shutdown
 func run() error {
 	// Load configuration
 	cfg, err := config.Load()
@@ -37,7 +37,7 @@ func run() error {
 		return errors.Wrap(err, "failed to load configuration")
 	}
 
-	// Initialize global logger based on environment
+	// Initialize logger
 	if cfg.IsDevelopment() {
 		logger.InitDevelopment()
 	} else {
@@ -49,10 +49,10 @@ func run() error {
 		slog.String("addr", cfg.Server.Addr()),
 	)
 
-	// Create HTTP handler with all routes
+	// Create HTTP handler
 	h := handler.New()
 
-	// Create and configure the server
+	// Create and start server
 	srv := server.New(server.Options{
 		Addr:            cfg.Server.Addr(),
 		Handler:         h,
@@ -62,6 +62,5 @@ func run() error {
 		ShutdownTimeout: cfg.Server.ShutdownTimeout,
 	})
 
-	// Run the server (blocks until shutdown signal)
 	return srv.Run(context.Background())
 }

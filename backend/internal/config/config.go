@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
 )
 
 // Config holds all configuration values for the application.
@@ -60,7 +62,7 @@ func Load() (*Config, error) {
 		},
 	}
 
-	if err := cfg.validate(); err != nil {
+	if err := cfg.validate(); errors.Check(err) {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 

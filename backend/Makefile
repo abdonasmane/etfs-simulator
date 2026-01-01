@@ -1,4 +1,4 @@
-.PHONY: fmt lint test run build clean
+.PHONY: fmt lint test run build clean swagger
 
 # Development
 run:
@@ -7,6 +7,10 @@ run:
 # Build
 build:
 	@go build -o bin/api ./cmd/api
+
+# Documentation
+swagger:
+	@swag init -g cmd/api/main.go -o swagger-docs --parseDependency --parseInternal
 
 # Code quality
 fmt:
@@ -28,3 +32,4 @@ test-coverage:
 clean:
 	@rm -rf bin/
 	@rm -f coverage.out coverage.html
+	@rm -rf swagger-docs
