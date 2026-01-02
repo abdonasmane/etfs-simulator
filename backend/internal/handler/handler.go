@@ -9,7 +9,6 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
-	_ "github.com/abdonasmane/etfs-simulator/backend/swagger-docs" // swagger docs
 )
 
 // Handler is the main HTTP handler that routes requests.
@@ -27,8 +26,19 @@ func New() *Handler {
 	return h
 }
 
-// ServeHTTP implements the http.Handler interface.
+// ServeHTTP implements the http.Handler interface with CORS support.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Set CORS headers for all requests
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	// Handle preflight requests
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
 	h.mux.ServeHTTP(w, r)
 }
 
