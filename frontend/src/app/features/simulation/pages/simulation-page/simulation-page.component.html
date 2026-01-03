@@ -1,0 +1,49 @@
+<div class="app-shell">
+  <!-- Top navbar -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="brand">
+        <span class="brand-icon">📊</span>
+        <span class="brand-name">ETF Simulator</span>
+      </div>
+      <div class="brand-tagline">Investment Growth Calculator</div>
+    </div>
+  </nav>
+
+  <!-- Main content area -->
+  <div class="main-content">
+    <aside class="form-section">
+      <app-simulation-form (simulate)="onSimulate($event)" />
+    </aside>
+
+    <main class="results-section">
+      @if (error()) {
+        <div class="error fade-in">
+          <p>{{ error() }}</p>
+        </div>
+      } @else if (summary()) {
+         <div class="results-wrapper" [class.updating]="loading()" [@resultChange]="resultKey()">
+          @if (loading()) {
+            <div class="update-overlay">
+              <div class="update-spinner"></div>
+            </div>
+          }
+          <div class="results-content">
+            <app-simulation-results [summary]="summary()!" [projections]="projections()" />
+          </div>
+        </div>
+      } @else if (loading()) {
+        <div class="loading fade-in">
+          <div class="spinner"></div>
+          <p>Calculating your investment growth...</p>
+        </div>
+      } @else {
+        <div class="placeholder fade-in">
+          <div class="placeholder-icon">📈</div>
+          <h3>Ready to simulate</h3>
+          <p>Enter your investment details and click Calculate to see your projected growth.</p>
+        </div>
+      }
+    </main>
+  </div>
+</div>

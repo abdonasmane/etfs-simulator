@@ -1,0 +1,89 @@
+<div class="simulation-results">
+  <!-- Hero Result -->
+  <div class="hero-result">
+    <div class="hero-label">Projected Portfolio Value by {{ summary.targetDate }}</div>
+    <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+    <div class="hero-gain">
+      <span class="gain-badge">
+        +{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+        <span class="gain-percent">(+{{ summary.percentageGain | number: '1.1-1' }}%)</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <app-growth-chart [projections]="projections" />
+
+  <!-- Summary Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">💰</div>
+      <div class="stat-content">
+        <div class="stat-value">{{ summary.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+        <div class="stat-label">Total Contributed</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">📈</div>
+      <div class="stat-content">
+        <div class="stat-value positive">{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+        <div class="stat-label">Investment Returns</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">📅</div>
+      <div class="stat-content">
+        <div class="stat-value">{{ (summary.totalMonths / 12) | number: '1.1-1' }} years</div>
+        <div class="stat-label">Investment Period</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-icon">⚡</div>
+      <div class="stat-content">
+        <div class="stat-value positive">+{{ summary.percentageGain | number: '1.1-1' }}%</div>
+        <div class="stat-label">Total Return</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Projections Table -->
+  <div class="projections-section">
+    <div class="projections-header">
+      <h3>Growth Timeline</h3>
+      <button class="toggle-btn" (click)="toggleView()">
+        {{ showMonthly ? 'Yearly View' : 'Monthly View' }}
+      </button>
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th class="align-right">Contributed</th>
+            <th class="align-right">Portfolio Value</th>
+            <th class="align-right">Gain</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (projection of displayedProjections; track projection.year + '-' + projection.month) {
+            <tr>
+              <td class="date-cell">
+                <span class="date-month">{{ getMonthName(projection.month) }}</span>
+                <span class="date-year">{{ projection.year }}</span>
+              </td>
+              <td class="align-right">{{ projection.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}</td>
+              <td class="align-right value-cell">{{ projection.portfolioValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</td>
+              <td class="align-right gain-cell">
+                +{{ getGain(projection) | currency: 'EUR' : 'symbol' : '1.0-0' }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
