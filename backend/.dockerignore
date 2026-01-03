@@ -1,0 +1,14 @@
+# Build artifacts
+bin/
+docs/
+
+# Test artifacts
+*.out
+coverage.*
+
+# IDE
+.idea/
+.vscode/
+
+# Env files
+.env

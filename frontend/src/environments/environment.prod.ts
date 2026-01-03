@@ -3,5 +3,5 @@
  */
 export const environment = {
   production: true,
-  apiUrl: '/api', // Assumes reverse proxy in production
+  apiUrl: '', // Nginx proxies /api/* and /health to backend
 };
