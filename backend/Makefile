@@ -1,16 +1,16 @@
 .PHONY: fmt lint test run build clean swagger
 
-# Development
-run:
+# Documentation (generated automatically)
+swagger:
+	@swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal 2>/dev/null
+
+# Development - auto-generates swagger before running
+run: swagger
 	@go run ./cmd/api
 
-# Build
-build:
+# Build - auto-generates swagger before building
+build: swagger
 	@go build -o bin/api ./cmd/api
-
-# Documentation
-swagger:
-	@swag init -g cmd/api/main.go -o swagger-docs --parseDependency --parseInternal
 
 # Code quality
 fmt:
@@ -32,4 +32,4 @@ test-coverage:
 clean:
 	@rm -rf bin/
 	@rm -f coverage.out coverage.html
-	@rm -rf swagger-docs
+	@rm -rf docs

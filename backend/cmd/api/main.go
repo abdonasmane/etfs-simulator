@@ -15,6 +15,8 @@ import (
 	"log/slog"
 	"os"
 
+	_ "github.com/abdonasmane/etfs-simulator/backend/docs" // Swagger docs
+
 	"github.com/abdonasmane/etfs-simulator/backend/internal/config"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/handler"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/server"
