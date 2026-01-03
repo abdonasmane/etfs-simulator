@@ -1,4 +1,12 @@
-.PHONY: fmt lint test run build clean swagger
+.PHONY: fmt lint test run build clean swagger setup
+
+# First-time setup - install required CLI tools
+setup:
+	@echo "Installing CLI tools..."
+	go install github.com/swaggo/swag/cmd/swag@latest
+	go install golang.org/x/tools/cmd/goimports@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@echo "✓ Ready! Run 'make run' to start the server"
 
 # Documentation (generated automatically)
 swagger:
