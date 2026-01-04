@@ -43,12 +43,11 @@ export class SimulationFormComponent {
     { label: 'Custom...', value: -1 },
   ];
 
-  /** Options for expected annual return dropdown */
+  /** Options for expected annual return based on historical index performance */
   returnOptions: SelectOption[] = [
-    { label: 'Conservative - 5%', value: 5 },
-    { label: 'Balanced - 7%', value: 7 },
-    { label: 'Growth - 10%', value: 10 },
-    { label: 'Aggressive - 12%', value: 12 },
+    { label: 'S&P 500 - 10.5%', value: 10.5, hint: 'since 1957' },
+    { label: 'MSCI World - 9%', value: 9, hint: 'since 1987' },
+    { label: 'NASDAQ 100 - 14%', value: 14, hint: 'since 1985' },
     { label: 'Custom...', value: -1 },
   ];
 
@@ -56,7 +55,7 @@ export class SimulationFormComponent {
   selectedGrowthOption = 0;
 
   /** Selected return option value (-1 means custom) */
-  selectedReturnOption = 7;
+  selectedReturnOption = 9;
 
   /** Available months for target date selection */
   monthOptions: SelectOption[] = [
@@ -80,7 +79,7 @@ export class SimulationFormComponent {
     this.form = this.fb.group({
       initialInvestment: [1000, [Validators.required, Validators.min(0)]],
       monthlyContribution: [500, [Validators.required, Validators.min(0)]],
-      annualReturnRate: [7, [Validators.required, Validators.min(0), Validators.max(100)]],
+      annualReturnRate: [9, [Validators.required, Validators.min(0), Validators.max(100)]],
       contributionGrowthRate: [0, [Validators.required, Validators.min(0), Validators.max(20)]],
       years: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetYearsFromNow: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
