@@ -1,6 +1,7 @@
 import { Component, EventEmitter, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
+import { CustomSelectComponent, SelectOption } from '../../../../shared/components/custom-select/custom-select.component';
 
 /**
  * Form data emitted when user submits a simulation request.
@@ -17,22 +18,13 @@ export interface SimulationFormData {
 }
 
 /**
- * Option for contribution growth rate dropdown.
- * Use value = -1 for "Custom" option.
- */
-interface GrowthOption {
-  label: string;
-  value: number;
-}
-
-/**
  * Form component for entering simulation parameters.
  * Supports both "by years" and "by target date" modes.
  */
 @Component({
   selector: 'app-simulation-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, CustomSelectComponent],
   templateUrl: './simulation-form.component.html',
   styleUrl: './simulation-form.component.scss',
 })
@@ -44,18 +36,30 @@ export class SimulationFormComponent {
   currentYear = new Date().getFullYear();
 
   /** Options for contribution growth rate dropdown */
-  growthOptions: GrowthOption[] = [
+  growthOptions: SelectOption[] = [
     { label: 'None - fixed contribution', value: 0 },
     { label: '+2.5%/year (typical inflation)', value: 2.5 },
     { label: '+4%/year (typical salary growth)', value: 4 },
     { label: 'Custom...', value: -1 },
   ];
 
+  /** Options for expected annual return dropdown */
+  returnOptions: SelectOption[] = [
+    { label: 'Conservative - 5%', value: 5 },
+    { label: 'Balanced - 7%', value: 7 },
+    { label: 'Growth - 10%', value: 10 },
+    { label: 'Aggressive - 12%', value: 12 },
+    { label: 'Custom...', value: -1 },
+  ];
+
   /** Selected growth option value (-1 means custom) */
   selectedGrowthOption = 0;
 
+  /** Selected return option value (-1 means custom) */
+  selectedReturnOption = 7;
+
   /** Available months for target date selection */
-  months = [
+  monthOptions: SelectOption[] = [
     { value: 1, label: 'January' },
     { value: 2, label: 'February' },
     { value: 3, label: 'March' },
@@ -78,8 +82,8 @@ export class SimulationFormComponent {
       monthlyContribution: [500, [Validators.required, Validators.min(0)]],
       annualReturnRate: [7, [Validators.required, Validators.min(0), Validators.max(100)]],
       contributionGrowthRate: [0, [Validators.required, Validators.min(0), Validators.max(20)]],
-      years: [10, [Validators.required, Validators.min(1), Validators.max(50)]],
-      targetYear: [this.currentYear + 10, [Validators.required, Validators.min(this.currentYear + 1)]],
+      years: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
+      targetYearsFromNow: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetMonth: [12, [Validators.required, Validators.min(1), Validators.max(12)]],
     });
   }
@@ -97,10 +101,18 @@ export class SimulationFormComponent {
   onGrowthOptionChange(value: number): void {
     this.selectedGrowthOption = value;
     if (value >= 0) {
-      // Preset selected - apply the value
       this.form.patchValue({ contributionGrowthRate: value });
     }
-    // If custom (-1), keep the current form value and show input
+  }
+
+  /**
+   * Handle return option selection from dropdown.
+   */
+  onReturnOptionChange(value: number): void {
+    this.selectedReturnOption = value;
+    if (value >= 0) {
+      this.form.patchValue({ annualReturnRate: value });
+    }
   }
 
   /**
@@ -108,6 +120,20 @@ export class SimulationFormComponent {
    */
   get isCustomGrowth(): boolean {
     return this.selectedGrowthOption === -1;
+  }
+
+  /**
+   * Check if custom return rate input should be shown.
+   */
+  get isCustomReturn(): boolean {
+    return this.selectedReturnOption === -1;
+  }
+
+  /**
+   * Get the target year based on years from now.
+   */
+  get targetYear(): number {
+    return this.currentYear + (this.form.value.targetYearsFromNow || 10);
   }
 
   /**
@@ -130,7 +156,7 @@ export class SimulationFormComponent {
     if (this.mode === 'years') {
       data.years = formValue.years;
     } else {
-      data.targetYear = formValue.targetYear;
+      data.targetYear = this.targetYear;
       data.targetMonth = formValue.targetMonth;
     }
 
