@@ -1,6 +1,92 @@
 /**
  * Global styles for the ETFs Simulator application.
+ * Supports light and dark themes via CSS custom properties.
  */
+
+// Import Inter font
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+// ============================================
+// CSS Custom Properties (Theme Variables)
+// ============================================
+
+:root {
+  // Light theme (default)
+  --color-bg-primary: #f8fafc;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f1f5f9;
+  --color-bg-hover: #e2e8f0;
+  
+  --color-text-primary: #1a1a2e;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+  
+  --color-border: #e2e8f0;
+  --color-border-light: #f1f5f9;
+  
+  --color-accent: #4361ee;
+  --color-accent-hover: #3451d1;
+  --color-accent-light: rgba(67, 97, 238, 0.1);
+  
+  --color-success: #10b981;
+  --color-success-light: rgba(16, 185, 129, 0.1);
+  
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  
+  --color-card-shadow: rgba(0, 0, 0, 0.06);
+  --color-card-shadow-hover: rgba(0, 0, 0, 0.1);
+  
+  --color-scrollbar-track: #f1f5f9;
+  --color-scrollbar-thumb: #cbd5e1;
+  --color-scrollbar-thumb-hover: #94a3b8;
+  
+  --color-selection: rgba(67, 97, 238, 0.2);
+  
+  // Gradient for hero
+  --gradient-hero: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+  --color-hero-shadow: rgba(67, 97, 238, 0.3);
+}
+
+[data-theme='dark'] {
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-bg-tertiary: #334155;
+  --color-bg-hover: #475569;
+  
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  
+  --color-border: #334155;
+  --color-border-light: #1e293b;
+  
+  --color-accent: #818cf8;
+  --color-accent-hover: #a5b4fc;
+  --color-accent-light: rgba(129, 140, 248, 0.15);
+  
+  --color-success: #34d399;
+  --color-success-light: rgba(52, 211, 153, 0.15);
+  
+  --color-error: #f87171;
+  --color-warning: #fbbf24;
+  
+  --color-card-shadow: rgba(0, 0, 0, 0.3);
+  --color-card-shadow-hover: rgba(0, 0, 0, 0.4);
+  
+  --color-scrollbar-track: #1e293b;
+  --color-scrollbar-thumb: #475569;
+  --color-scrollbar-thumb-hover: #64748b;
+  
+  --color-selection: rgba(129, 140, 248, 0.3);
+  
+  --gradient-hero: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
+  --color-hero-shadow: rgba(99, 102, 241, 0.3);
+}
+
+// ============================================
+// Base Styles
+// ============================================
 
 *,
 *::before,
@@ -28,21 +114,19 @@ body {
     Ubuntu,
     Cantarell,
     sans-serif;
-  background: #f8fafc;
-  color: #1a1a2e;
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
   line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
-// Import Inter font
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 a {
-  color: #4361ee;
+  color: var(--color-accent);
   text-decoration: none;
   transition: color 0.2s ease;
 
   &:hover {
-    color: #3451d1;
+    color: var(--color-accent-hover);
   }
 }
 
@@ -63,16 +147,16 @@ textarea {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--color-scrollbar-track);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-scrollbar-thumb);
   border-radius: 4px;
 
   &:hover {
-    background: #94a3b8;
+    background: var(--color-scrollbar-thumb-hover);
   }
 }
 
@@ -89,6 +173,7 @@ input[type='number'] {
 
 // Selection color
 ::selection {
-  background: rgba(67, 97, 238, 0.2);
-  color: #1a1a2e;
+  background: var(--color-selection);
+  color: var(--color-text-primary);
 }
+

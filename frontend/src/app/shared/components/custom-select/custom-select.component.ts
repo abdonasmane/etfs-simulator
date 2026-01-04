@@ -81,11 +81,11 @@ export interface SelectOption {
       width: 100%;
       padding: 0.875rem 1rem;
       padding-right: 2.5rem;
-      border: 2px solid #e2e8f0;
+      border: 2px solid var(--color-border);
       border-radius: 10px;
-      background: #ffffff;
+      background: var(--color-bg-secondary);
       font-size: 1rem;
-      color: #1a1a2e;
+      color: var(--color-text-primary);
       text-align: left;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -94,19 +94,19 @@ export interface SelectOption {
       justify-content: space-between;
 
       &:hover {
-        border-color: #cbd5e1;
+        border-color: var(--color-text-muted);
       }
 
       &:focus {
         outline: none;
-        border-color: #4361ee;
-        box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+        border-color: var(--color-accent);
+        box-shadow: 0 0 0 3px var(--color-accent-light);
       }
     }
 
     .custom-select.open .select-trigger {
-      border-color: #4361ee;
-      box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px var(--color-accent-light);
     }
 
     .selected-label {
@@ -119,7 +119,7 @@ export interface SelectOption {
     .arrow {
       display: flex;
       align-items: center;
-      color: #64748b;
+      color: var(--color-text-secondary);
       transition: transform 0.2s ease;
     }
 
@@ -132,10 +132,10 @@ export interface SelectOption {
       top: calc(100% + 4px);
       left: 0;
       right: 0;
-      background: #ffffff;
-      border: 2px solid #e2e8f0;
+      background: var(--color-bg-secondary);
+      border: 2px solid var(--color-border);
       border-radius: 10px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+      box-shadow: 0 10px 40px var(--color-card-shadow-hover);
       z-index: 100;
       max-height: 280px;
       overflow-y: auto;
@@ -147,7 +147,7 @@ export interface SelectOption {
       border: none;
       background: transparent;
       font-size: 0.95rem;
-      color: #1a1a2e;
+      color: var(--color-text-primary);
       text-align: left;
       cursor: pointer;
       display: flex;
@@ -164,12 +164,12 @@ export interface SelectOption {
       }
 
       &:hover {
-        background: #f1f5f9;
+        background: var(--color-bg-tertiary);
       }
 
       &.selected {
-        background: rgba(67, 97, 238, 0.08);
-        color: #4361ee;
+        background: var(--color-accent-light);
+        color: var(--color-accent);
         font-weight: 600;
       }
     }
@@ -180,11 +180,11 @@ export interface SelectOption {
 
     .option-hint {
       font-size: 0.8rem;
-      color: #94a3b8;
+      color: var(--color-text-muted);
     }
 
     .check {
-      color: #4361ee;
+      color: var(--color-accent);
       font-weight: 700;
     }
   `]

@@ -6,11 +6,14 @@ import {
   ElementRef,
   ViewChild,
   AfterViewInit,
+  inject,
+  effect,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
 
 import { MonthProjection } from '../../../../core/models';
+import { ThemeService } from '../../../../core/services';
 
 // Register Chart.js components
 Chart.register(...registerables);
@@ -34,10 +37,11 @@ Chart.register(...registerables);
         position: relative;
         width: 100%;
         height: 300px;
-        background: #ffffff;
+        background: var(--color-bg-secondary);
         border-radius: 12px;
         padding: 1rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        box-shadow: 0 2px 4px var(--color-card-shadow);
+        transition: background-color 0.3s ease;
       }
     `,
   ],
@@ -47,7 +51,21 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
 
   @ViewChild('chartCanvas') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
+  private readonly themeService = inject(ThemeService);
   private chart: Chart | null = null;
+
+  constructor() {
+    // Recreate chart when theme changes
+    effect(() => {
+      // Access the signal to subscribe to changes
+      this.themeService.theme();
+      if (this.chart && this.chartCanvas?.nativeElement) {
+        this.chart.destroy();
+        this.chart = null;
+        this.createChart();
+      }
+    });
+  }
 
   ngAfterViewInit(): void {
     this.createChart();
@@ -57,6 +75,44 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     if (changes['projections'] && this.chart) {
       this.updateChart();
     }
+  }
+
+  /** Get theme-aware colors */
+  private get colors(): {
+    text: string;
+    textMuted: string;
+    grid: string;
+    accent: string;
+    accentLight: string;
+    contributed: string;
+    optimistic: string;
+    pessimistic: string;
+    tooltipBg: string;
+  } {
+    const isDark = this.themeService.isDark();
+    return isDark
+      ? {
+          text: '#f1f5f9',
+          textMuted: '#94a3b8',
+          grid: '#334155',
+          accent: '#818cf8',
+          accentLight: 'rgba(129, 140, 248, 0.2)',
+          contributed: '#64748b',
+          optimistic: 'rgba(52, 211, 153, 0.6)',
+          pessimistic: 'rgba(248, 113, 113, 0.6)',
+          tooltipBg: '#1e293b',
+        }
+      : {
+          text: '#1a1a2e',
+          textMuted: '#94a3b8',
+          grid: '#f1f5f9',
+          accent: '#4361ee',
+          accentLight: 'rgba(67, 97, 238, 0.15)',
+          contributed: '#94a3b8',
+          optimistic: 'rgba(34, 197, 94, 0.5)',
+          pessimistic: 'rgba(239, 68, 68, 0.5)',
+          tooltipBg: '#1a1a2e',
+        };
   }
 
   private createChart(): void {
@@ -69,6 +125,8 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
 
     const data = this.getChartData();
     const datasets = this.buildDatasets(ctx, data);
+
+    const colors = this.colors;
 
     this.chart = new Chart(ctx, {
       type: 'line',
@@ -91,6 +149,7 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
             labels: {
               usePointStyle: true,
               padding: 20,
+              color: colors.text,
               font: {
                 size: 12,
                 family: '-apple-system, BlinkMacSystemFont, sans-serif',
@@ -98,7 +157,9 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
             },
           },
           tooltip: {
-            backgroundColor: '#1a1a2e',
+            backgroundColor: colors.tooltipBg,
+            titleColor: '#ffffff',
+            bodyColor: '#e2e8f0',
             titleFont: {
               size: 14,
               weight: 'bold',
@@ -127,20 +188,20 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
               font: {
                 size: 11,
               },
-              color: '#94a3b8',
+              color: colors.textMuted,
             },
           },
           y: {
             display: true,
             grid: {
-              color: '#f1f5f9',
+              color: colors.grid,
             },
             ticks: {
               callback: (value): string => `€${Number(value).toLocaleString('de-DE', { notation: 'compact' })}`,
               font: {
                 size: 11,
               },
-              color: '#94a3b8',
+              color: colors.textMuted,
             },
           },
         },
@@ -173,6 +234,7 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     data: ReturnType<typeof this.getChartData>
   ): Chart['data']['datasets'] {
     const datasets: Chart['data']['datasets'] = [];
+    const colors = this.colors;
 
     // If we have range data, add the confidence area first (so it's behind)
     if (data.optimisticValues && data.pessimisticValues) {
@@ -180,13 +242,13 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       datasets.push({
         label: 'Optimistic',
         data: data.optimisticValues,
-        borderColor: 'rgba(34, 197, 94, 0.4)', // Green
+        borderColor: colors.optimistic,
         backgroundColor: 'transparent',
         fill: false,
         tension: 0.4,
         pointRadius: 0,
         pointHoverRadius: 4,
-        borderWidth: 1,
+        borderWidth: 2,
         borderDash: [4, 4],
       });
 
@@ -194,13 +256,13 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       datasets.push({
         label: 'Pessimistic',
         data: data.pessimisticValues,
-        borderColor: 'rgba(239, 68, 68, 0.4)', // Red
-        backgroundColor: this.hexToRgba('#4361ee', 0.1), // Light blue fill
+        borderColor: colors.pessimistic,
+        backgroundColor: colors.accentLight,
         fill: '-1', // Fill to previous dataset (optimistic)
         tension: 0.4,
         pointRadius: 0,
         pointHoverRadius: 4,
-        borderWidth: 1,
+        borderWidth: 2,
         borderDash: [4, 4],
       });
     }
@@ -209,14 +271,14 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     datasets.push({
       label: this.hasRangeData ? 'Expected (Median)' : 'Portfolio Value',
       data: data.portfolioValues,
-      borderColor: '#4361ee',
-      backgroundColor: this.hasRangeData ? 'transparent' : this.createGradient(ctx, '#4361ee', 0.3),
+      borderColor: colors.accent,
+      backgroundColor: this.hasRangeData ? 'transparent' : this.createGradient(ctx, colors.accent, 0.3),
       fill: !this.hasRangeData,
       tension: 0.4,
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointHoverBackgroundColor: '#4361ee',
-      pointHoverBorderColor: '#ffffff',
+      pointHoverBackgroundColor: colors.accent,
+      pointHoverBorderColor: this.themeService.isDark() ? '#1e293b' : '#ffffff',
       pointHoverBorderWidth: 2,
       borderWidth: 2.5,
     });
@@ -225,14 +287,14 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     datasets.push({
       label: 'Total Contributed',
       data: data.contributions,
-      borderColor: '#94a3b8',
-      backgroundColor: this.createGradient(ctx, '#94a3b8', 0.1),
+      borderColor: colors.contributed,
+      backgroundColor: this.createGradient(ctx, colors.contributed, 0.15),
       fill: true,
       tension: 0.4,
       pointRadius: 0,
       pointHoverRadius: 6,
-      pointHoverBackgroundColor: '#94a3b8',
-      pointHoverBorderColor: '#ffffff',
+      pointHoverBackgroundColor: colors.contributed,
+      pointHoverBorderColor: this.themeService.isDark() ? '#1e293b' : '#ffffff',
       pointHoverBorderWidth: 2,
       borderDash: [5, 5],
     });

@@ -6,12 +6,12 @@
 
 // Hero Result Card
 .hero-result {
-  background: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
+  background: var(--gradient-hero);
   border-radius: 16px;
   padding: 2rem;
   text-align: center;
   color: white;
-  box-shadow: 0 10px 40px rgba(67, 97, 238, 0.3);
+  box-shadow: 0 10px 40px var(--color-hero-shadow);
   transition: all 0.3s ease;
 
   .hero-label {
@@ -97,15 +97,15 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: #ffffff;
+  background: var(--color-bg-secondary);
   border-radius: 12px;
   padding: 0.875rem 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 4px var(--color-card-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px var(--color-card-shadow-hover);
   }
 
   .stat-icon {
@@ -121,25 +121,25 @@
   .stat-value {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-text-primary);
     transition: all 0.3s ease;
     white-space: nowrap;
 
     &.positive {
-      color: #10b981;
+      color: var(--color-success);
     }
   }
 
   .stat-range {
     font-size: 0.7rem;
-    color: #94a3b8;
+    color: var(--color-text-muted);
     margin-top: 0.125rem;
     white-space: nowrap;
   }
 
   .stat-label {
     font-size: 0.75rem;
-    color: #64748b;
+    color: var(--color-text-secondary);
     margin-top: 0.125rem;
     white-space: nowrap;
   }
@@ -147,10 +147,11 @@
 
 // Contribution Milestones
 .milestones-section {
-  background: #ffffff;
+  background: var(--color-bg-secondary);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px var(--color-card-shadow);
+  transition: background-color 0.3s ease;
 }
 
 .milestones-header {
@@ -162,14 +163,14 @@
   transition: background 0.2s ease;
 
   &:hover {
-    background: #f8fafc;
+    background: var(--color-bg-tertiary);
   }
 
   h3 {
     margin: 0;
     font-size: 0.95rem;
     font-weight: 600;
-    color: #1a1a2e;
+    color: var(--color-text-primary);
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -182,7 +183,7 @@
   .milestone-summary {
     flex: 1;
     font-size: 0.85rem;
-    color: #10b981;
+    color: var(--color-success);
     font-weight: 600;
   }
 
@@ -190,11 +191,11 @@
     width: 28px;
     height: 28px;
     border: none;
-    background: #f1f5f9;
+    background: var(--color-bg-tertiary);
     border-radius: 6px;
     font-size: 1.2rem;
     font-weight: 600;
-    color: #64748b;
+    color: var(--color-text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
@@ -202,13 +203,13 @@
     justify-content: center;
 
     &:hover {
-      background: #e2e8f0;
-      color: #1a1a2e;
+      background: var(--color-bg-hover);
+      color: var(--color-text-primary);
     }
   }
 
   &:focus {
-    outline: 2px solid #4361ee;
+    outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
 }
@@ -218,12 +219,12 @@
   gap: 0.75rem;
   padding: 0.5rem 1.25rem 1.25rem;
   overflow-x: auto;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--color-border-light);
 }
 
 .milestone-card {
   flex-shrink: 0;
-  background: #f8fafc;
+  background: var(--color-bg-tertiary);
   border-radius: 8px;
   padding: 0.75rem 1rem;
   text-align: center;
@@ -231,7 +232,7 @@
 
   .milestone-year {
     font-size: 0.7rem;
-    color: #64748b;
+    color: var(--color-text-secondary);
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -241,7 +242,7 @@
   .milestone-value {
     font-size: 0.95rem;
     font-weight: 700;
-    color: #1a1a2e;
+    color: var(--color-text-primary);
   }
 }
 
@@ -284,10 +285,11 @@
 
 // Projections Table
 .projections-section {
-  background: #ffffff;
+  background: var(--color-bg-secondary);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 4px var(--color-card-shadow);
+  transition: background-color 0.3s ease;
 }
 
 .projections-header {
@@ -295,29 +297,29 @@
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border-light);
 
   h3 {
     margin: 0;
     font-size: 1rem;
     font-weight: 600;
-    color: #1a1a2e;
+    color: var(--color-text-primary);
   }
 
   .toggle-btn {
     padding: 0.5rem 1rem;
-    background: #f1f5f9;
+    background: var(--color-bg-tertiary);
     border: none;
     border-radius: 8px;
     font-size: 0.85rem;
     font-weight: 500;
-    color: #475569;
+    color: var(--color-text-secondary);
     cursor: pointer;
     transition: all 0.2s ease;
 
     &:hover {
-      background: #e2e8f0;
-      color: #1a1a2e;
+      background: var(--color-bg-hover);
+      color: var(--color-text-primary);
     }
   }
 }
@@ -341,42 +343,42 @@ table {
   thead {
     position: sticky;
     top: 0;
-    background: #f8fafc;
+    background: var(--color-bg-tertiary);
     z-index: 1;
 
     th {
       font-weight: 600;
-      color: #64748b;
+      color: var(--color-text-secondary);
       font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid var(--color-border);
     }
   }
 
   tbody {
     tr {
-      border-bottom: 1px solid #f1f5f9;
+      border-bottom: 1px solid var(--color-border-light);
       transition: background-color 0.15s ease;
 
       &:hover {
-        background: #f8fafc;
+        background: var(--color-bg-tertiary);
       }
 
       &:last-child {
         border-bottom: none;
-        background: #f0fdf4;
+        background: var(--color-success-light);
         font-weight: 600;
 
         .gain-cell {
-          color: #059669;
+          color: var(--color-success);
         }
       }
     }
 
     td {
       font-size: 0.9rem;
-      color: #334155;
+      color: var(--color-text-secondary);
     }
   }
 
@@ -386,23 +388,23 @@ table {
 
   .date-cell {
     .date-month {
-      color: #64748b;
+      color: var(--color-text-secondary);
       margin-right: 0.25rem;
     }
 
     .date-year {
       font-weight: 600;
-      color: #1a1a2e;
+      color: var(--color-text-primary);
     }
   }
 
   .value-cell {
     font-weight: 600;
-    color: #1a1a2e;
+    color: var(--color-text-primary);
   }
 
   .gain-cell {
-    color: #10b981;
+    color: var(--color-success);
     font-weight: 500;
   }
 }

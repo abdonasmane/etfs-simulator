@@ -9,6 +9,7 @@ import {
   SimulationFormData,
 } from '../../components/simulation-form/simulation-form.component';
 import { SimulationResultsComponent } from '../../components/simulation-results/simulation-results.component';
+import { ThemeToggleComponent } from '../../../../shared/components/theme-toggle/theme-toggle.component';
 
 /**
  * Main page for investment simulation.
@@ -17,7 +18,7 @@ import { SimulationResultsComponent } from '../../components/simulation-results/
 @Component({
   selector: 'app-simulation-page',
   standalone: true,
-  imports: [CommonModule, SimulationFormComponent, SimulationResultsComponent],
+  imports: [CommonModule, SimulationFormComponent, SimulationResultsComponent, ThemeToggleComponent],
   templateUrl: './simulation-page.component.html',
   styleUrl: './simulation-page.component.scss',
   animations: [
