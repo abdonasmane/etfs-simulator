@@ -73,8 +73,25 @@ type PricePoint struct {
 type HistoricalData struct {
 	Symbol     string
 	Currency   string
+	Interval   string // Data interval: "1d", "1wk", "1mo", etc.
 	DataPoints []PricePoint
 	FetchedAt  time.Time
+}
+
+// PointsPerYear returns the expected number of data points per year for a given interval.
+func PointsPerYear(interval string) int {
+	switch interval {
+	case "1d":
+		return 252 // Trading days per year
+	case "1wk":
+		return 52
+	case "1mo":
+		return 12
+	case "3mo":
+		return 4
+	default:
+		return 12 // Default to monthly
+	}
 }
 
 // IndexStats contains statistical analysis of historical returns.
@@ -136,6 +153,7 @@ func (c *YahooClient) FetchHistoricalData(symbol, interval, rangePeriod string) 
 	data := &HistoricalData{
 		Symbol:     result.Meta.Symbol,
 		Currency:   result.Meta.Currency,
+		Interval:   interval,
 		DataPoints: make([]PricePoint, 0, len(result.Timestamp)),
 		FetchedAt:  time.Now(),
 	}
@@ -181,17 +199,20 @@ func (c *YahooClient) FetchHistoricalData(symbol, interval, rangePeriod string) 
 // CalculateStats computes statistical analysis from historical data.
 // rollingYears specifies the rolling period for calculating returns (e.g., 20 for 20-year returns).
 func (c *YahooClient) CalculateStats(data *HistoricalData, rollingYears int) (*IndexStats, error) {
-	if len(data.DataPoints) < 12*rollingYears {
-		return nil, errors.Errorf("insufficient data: need at least %d months, got %d",
-			12*rollingYears, len(data.DataPoints))
+	pointsPerYear := PointsPerYear(data.Interval)
+	requiredPoints := pointsPerYear * rollingYears
+
+	if len(data.DataPoints) < requiredPoints {
+		return nil, errors.Errorf("insufficient data: need at least %d data points (%d years of %s data), got %d",
+			requiredPoints, rollingYears, data.Interval, len(data.DataPoints))
 	}
 
 	// Calculate rolling annualized returns
-	rollingMonths := rollingYears * 12
+	rollingPeriod := rollingYears * pointsPerYear
 	var rollingReturns []float64
 
-	for i := rollingMonths; i < len(data.DataPoints); i++ {
-		startPrice := data.DataPoints[i-rollingMonths].AdjClose
+	for i := rollingPeriod; i < len(data.DataPoints); i++ {
+		startPrice := data.DataPoints[i-rollingPeriod].AdjClose
 		endPrice := data.DataPoints[i].AdjClose
 
 		if startPrice <= 0 || endPrice <= 0 {
@@ -220,7 +241,7 @@ func (c *YahooClient) CalculateStats(data *HistoricalData, rollingYears int) (*I
 	// Calculate statistics
 	stats := &IndexStats{
 		Symbol:             data.Symbol,
-		TotalYears:         float64(len(data.DataPoints)) / 12.0,
+		TotalYears:         float64(len(data.DataPoints)) / float64(pointsPerYear),
 		AnnualizedReturn:   percentile(sorted, 50), // Median
 		Percentile5Return:  percentile(sorted, 5),
 		Percentile95Return: percentile(sorted, 95),
