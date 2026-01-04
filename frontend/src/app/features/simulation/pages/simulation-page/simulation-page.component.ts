@@ -56,6 +56,7 @@ export class SimulationPageComponent {
           initialInvestment: data.initialInvestment,
           monthlyContribution: data.monthlyContribution,
           years: data.years,
+          indexSymbol: data.indexSymbol,
           annualReturnRate: data.annualReturnRate,
           contributionGrowthRate: data.contributionGrowthRate,
         })
@@ -75,6 +76,7 @@ export class SimulationPageComponent {
           monthlyContribution: data.monthlyContribution,
           targetYear: data.targetYear,
           targetMonth: data.targetMonth,
+          indexSymbol: data.indexSymbol,
           annualReturnRate: data.annualReturnRate,
           contributionGrowthRate: data.contributionGrowthRate,
         })

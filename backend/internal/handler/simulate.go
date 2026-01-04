@@ -23,7 +23,10 @@ type SimulateByYearsRequest struct {
 	// Years is the number of years to simulate (1-50).
 	Years int `json:"years" example:"10"`
 
-	// AnnualReturnRate is the expected annual return percentage (default: 7.0).
+	// IndexSymbol is the market index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections.
+	IndexSymbol *string `json:"indexSymbol,omitempty" example:"SPY"`
+
+	// AnnualReturnRate is the expected annual return percentage (default: 7.0). Ignored if IndexSymbol is provided.
 	AnnualReturnRate *float64 `json:"annualReturnRate,omitempty" example:"7.0"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
@@ -44,7 +47,10 @@ type SimulateByTargetRequest struct {
 	// TargetMonth is the target month (1-12). Defaults to 12 (December).
 	TargetMonth *int `json:"targetMonth,omitempty" example:"6"`
 
-	// AnnualReturnRate is the expected annual return percentage (default: 7.0).
+	// IndexSymbol is the market index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections.
+	IndexSymbol *string `json:"indexSymbol,omitempty" example:"SPY"`
+
+	// AnnualReturnRate is the expected annual return percentage (default: 7.0). Ignored if IndexSymbol is provided.
 	AnnualReturnRate *float64 `json:"annualReturnRate,omitempty" example:"7.0"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
@@ -60,6 +66,10 @@ type MonthProjection struct {
 	MonthlyContribution float64 `json:"monthlyContribution" example:"515.00"`
 	TotalContributed    float64 `json:"totalContributed" example:"4000"`
 	PortfolioValue      float64 `json:"portfolioValue" example:"4150.25"`
+
+	// Range values (only present when IndexSymbol is provided)
+	PessimisticValue *float64 `json:"pessimisticValue,omitempty" example:"3950.00"`
+	OptimisticValue  *float64 `json:"optimisticValue,omitempty" example:"4400.00"`
 }
 
 // ContributionMilestone shows the monthly contribution at key years.
@@ -81,6 +91,15 @@ type SimulateSummary struct {
 
 	// ContributionMilestones shows how contributions grow over time.
 	ContributionMilestones []ContributionMilestone `json:"contributionMilestones"`
+
+	// Range values (only present when IndexSymbol is provided)
+	HasRange           bool     `json:"hasRange"`
+	PessimisticValue   *float64 `json:"pessimisticValue,omitempty" example:"85000.00"`
+	OptimisticValue    *float64 `json:"optimisticValue,omitempty" example:"125000.00"`
+	PessimisticGain    *float64 `json:"pessimisticGain,omitempty" example:"24000.00"`
+	OptimisticGain     *float64 `json:"optimisticGain,omitempty" example:"64000.00"`
+	PessimisticPercent *float64 `json:"pessimisticPercent,omitempty" example:"39.3"`
+	OptimisticPercent  *float64 `json:"optimisticPercent,omitempty" example:"104.9"`
 }
 
 // SimulateByYearsResponse is the output for years-based simulation.
@@ -110,7 +129,7 @@ type SimulateByTargetResponse struct {
 //	@Success		200		{object}	SimulateByYearsResponse
 //	@Failure		400		{object}	ErrorResponse
 //	@Router			/api/v1/simulate/years [post]
-func handleSimulateByYears(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) {
 	var req SimulateByYearsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); errors.Check(err) {
 		respondError(w, http.StatusBadRequest, "invalid request body")
@@ -131,8 +150,28 @@ func handleSimulateByYears(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get index info if symbol provided
+	var indexInfo *indexReturnRates
+	if req.IndexSymbol != nil && *req.IndexSymbol != "" {
+		info, ok := h.indexService.GetIndex(*req.IndexSymbol)
+		if !ok {
+			respondError(w, http.StatusBadRequest, "unknown index symbol: "+*req.IndexSymbol)
+			return
+		}
+		indexInfo = &indexReturnRates{
+			median:      info.MedianReturn,
+			pessimistic: info.PessimisticReturn,
+			optimistic:  info.OptimisticReturn,
+		}
+	}
+
 	// Apply defaults
-	annualRate := applyDefault(req.AnnualReturnRate, 7.0)
+	var annualRate float64
+	if indexInfo != nil {
+		annualRate = indexInfo.median
+	} else {
+		annualRate = applyDefault(req.AnnualReturnRate, 7.0)
+	}
 	contributionGrowth := applyDefault(req.ContributionGrowthRate, 0.0)
 
 	req.AnnualReturnRate = &annualRate
@@ -153,19 +192,33 @@ func handleSimulateByYears(w http.ResponseWriter, r *http.Request) {
 	endMonth := startMonth
 	endYear := startYear + req.Years
 
-	// Run simulation
-	projections := simulateMonthly(
-		req.InitialInvestment,
-		req.MonthlyContribution,
-		startYear,
-		startMonth,
-		totalMonths,
-		annualRate,
-		contributionGrowth,
-	)
+	// Run simulation(s)
+	var projections []MonthProjection
+	var summary SimulateSummary
 
-	// Build response
-	summary := buildSummary(projections, totalMonths, endYear, endMonth, startYear)
+	if indexInfo != nil {
+		// Run all three simulations for range
+		projections, summary = simulateWithRange(
+			req.InitialInvestment,
+			req.MonthlyContribution,
+			startYear, startMonth,
+			totalMonths,
+			indexInfo,
+			contributionGrowth,
+			endYear, endMonth,
+		)
+	} else {
+		// Single simulation
+		projections = simulateMonthly(
+			req.InitialInvestment,
+			req.MonthlyContribution,
+			startYear, startMonth,
+			totalMonths,
+			annualRate,
+			contributionGrowth,
+		)
+		summary = buildSummary(projections, totalMonths, endYear, endMonth, startYear)
+	}
 
 	slog.Debug("simulation by years completed",
 		slog.Float64("initial", req.InitialInvestment),
@@ -173,6 +226,7 @@ func handleSimulateByYears(w http.ResponseWriter, r *http.Request) {
 		slog.Int("years", req.Years),
 		slog.Float64("contribution_growth", contributionGrowth),
 		slog.Float64("final_value", summary.FinalValue),
+		slog.Bool("has_range", summary.HasRange),
 	)
 
 	respondJSON(w, http.StatusOK, SimulateByYearsResponse{
@@ -193,7 +247,7 @@ func handleSimulateByYears(w http.ResponseWriter, r *http.Request) {
 //	@Success		200		{object}	SimulateByTargetResponse
 //	@Failure		400		{object}	ErrorResponse
 //	@Router			/api/v1/simulate/target [post]
-func handleSimulateByTarget(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request) {
 	var req SimulateByTargetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); errors.Check(err) {
 		respondError(w, http.StatusBadRequest, "invalid request body")
@@ -243,8 +297,28 @@ func handleSimulateByTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get index info if symbol provided
+	var indexInfo *indexReturnRates
+	if req.IndexSymbol != nil && *req.IndexSymbol != "" {
+		info, ok := h.indexService.GetIndex(*req.IndexSymbol)
+		if !ok {
+			respondError(w, http.StatusBadRequest, "unknown index symbol: "+*req.IndexSymbol)
+			return
+		}
+		indexInfo = &indexReturnRates{
+			median:      info.MedianReturn,
+			pessimistic: info.PessimisticReturn,
+			optimistic:  info.OptimisticReturn,
+		}
+	}
+
 	// Apply defaults
-	annualRate := applyDefault(req.AnnualReturnRate, 7.0)
+	var annualRate float64
+	if indexInfo != nil {
+		annualRate = indexInfo.median
+	} else {
+		annualRate = applyDefault(req.AnnualReturnRate, 7.0)
+	}
 	contributionGrowth := applyDefault(req.ContributionGrowthRate, 0.0)
 
 	req.AnnualReturnRate = &annualRate
@@ -256,19 +330,33 @@ func handleSimulateByTarget(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Run simulation
-	projections := simulateMonthly(
-		req.InitialInvestment,
-		req.MonthlyContribution,
-		startYear,
-		startMonth,
-		totalMonths,
-		annualRate,
-		contributionGrowth,
-	)
+	// Run simulation(s)
+	var projections []MonthProjection
+	var summary SimulateSummary
 
-	// Build response
-	summary := buildSummary(projections, totalMonths, req.TargetYear, endMonth, startYear)
+	if indexInfo != nil {
+		// Run all three simulations for range
+		projections, summary = simulateWithRange(
+			req.InitialInvestment,
+			req.MonthlyContribution,
+			startYear, startMonth,
+			totalMonths,
+			indexInfo,
+			contributionGrowth,
+			req.TargetYear, endMonth,
+		)
+	} else {
+		// Single simulation
+		projections = simulateMonthly(
+			req.InitialInvestment,
+			req.MonthlyContribution,
+			startYear, startMonth,
+			totalMonths,
+			annualRate,
+			contributionGrowth,
+		)
+		summary = buildSummary(projections, totalMonths, req.TargetYear, endMonth, startYear)
+	}
 
 	slog.Debug("simulation by target completed",
 		slog.Float64("initial", req.InitialInvestment),
@@ -276,6 +364,7 @@ func handleSimulateByTarget(w http.ResponseWriter, r *http.Request) {
 		slog.String("target", summary.TargetDate),
 		slog.Float64("contribution_growth", contributionGrowth),
 		slog.Float64("final_value", summary.FinalValue),
+		slog.Bool("has_range", summary.HasRange),
 	)
 
 	respondJSON(w, http.StatusOK, SimulateByTargetResponse{
@@ -422,4 +511,74 @@ func round2(val float64) float64 {
 // round1 rounds to 1 decimal place.
 func round1(val float64) float64 {
 	return math.Round(val*10) / 10
+}
+
+// indexReturnRates holds the three return rates for an index.
+type indexReturnRates struct {
+	median      float64
+	pessimistic float64
+	optimistic  float64
+}
+
+// simulateWithRange runs three simulations (pessimistic, median, optimistic) and merges results.
+func simulateWithRange(
+	initial, monthlyBase float64,
+	startYear, startMonth, totalMonths int,
+	rates *indexReturnRates,
+	contributionGrowth float64,
+	endYear, endMonth int,
+) ([]MonthProjection, SimulateSummary) {
+	// Run all three simulations
+	medianProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.median, contributionGrowth)
+	pessimisticProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.pessimistic, contributionGrowth)
+	optimisticProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.optimistic, contributionGrowth)
+
+	// Merge into single projection list with range values
+	projections := make([]MonthProjection, len(medianProj))
+	for i := range medianProj {
+		pessVal := pessimisticProj[i].PortfolioValue
+		optVal := optimisticProj[i].PortfolioValue
+
+		projections[i] = MonthProjection{
+			Year:                medianProj[i].Year,
+			Month:               medianProj[i].Month,
+			MonthlyContribution: medianProj[i].MonthlyContribution,
+			TotalContributed:    medianProj[i].TotalContributed,
+			PortfolioValue:      medianProj[i].PortfolioValue,
+			PessimisticValue:    &pessVal,
+			OptimisticValue:     &optVal,
+		}
+	}
+
+	// Build summary with range
+	summary := buildSummary(projections, totalMonths, endYear, endMonth, startYear)
+
+	// Add range values to summary
+	finalPess := pessimisticProj[len(pessimisticProj)-1]
+	finalOpt := optimisticProj[len(optimisticProj)-1]
+	totalContributed := summary.TotalContributed
+
+	pessGain := finalPess.PortfolioValue - totalContributed
+	optGain := finalOpt.PortfolioValue - totalContributed
+
+	var pessPercent, optPercent float64
+	if totalContributed > 0 {
+		pessPercent = round1((pessGain / totalContributed) * 100)
+		optPercent = round1((optGain / totalContributed) * 100)
+	}
+
+	pessValue := round2(finalPess.PortfolioValue)
+	optValue := round2(finalOpt.PortfolioValue)
+	pessGainRounded := round2(pessGain)
+	optGainRounded := round2(optGain)
+
+	summary.HasRange = true
+	summary.PessimisticValue = &pessValue
+	summary.OptimisticValue = &optValue
+	summary.PessimisticGain = &pessGainRounded
+	summary.OptimisticGain = &optGainRounded
+	summary.PessimisticPercent = &pessPercent
+	summary.OptimisticPercent = &optPercent
+
+	return projections, summary
 }

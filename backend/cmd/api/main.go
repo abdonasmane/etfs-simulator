@@ -19,6 +19,7 @@ import (
 
 	"github.com/abdonasmane/etfs-simulator/backend/internal/config"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/handler"
+	"github.com/abdonasmane/etfs-simulator/backend/internal/marketdata"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/server"
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/logger"
@@ -51,8 +52,17 @@ func run() error {
 		slog.String("addr", cfg.Server.Addr()),
 	)
 
+	// Initialize index service (fetches historical data from Yahoo Finance)
+	indexService := marketdata.NewIndexService()
+	if err := indexService.Initialize(); errors.Check(err) {
+		// Log warning but don't fail - service can work without historical data
+		slog.Warn("failed to initialize index service, range projections will be unavailable",
+			slog.String("error", err.Error()),
+		)
+	}
+
 	// Create HTTP handler
-	h := handler.New()
+	h := handler.New(indexService)
 
 	// Create and start server
 	srv := server.New(server.Options{

@@ -2,15 +2,37 @@
   <!-- Hero Result -->
   <div class="hero-result">
     <div class="hero-label">
-      Projected Portfolio Value by {{ summary.targetDate }}
+      @if (summary.hasRange) {
+        Expected Portfolio Value by {{ summary.targetDate }}
+      } @else {
+        Projected Portfolio Value by {{ summary.targetDate }}
+      }
     </div>
     <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+    
+    @if (summary.hasRange && summary.pessimisticValue && summary.optimisticValue) {
+      <div class="hero-range">
+        <span class="range-label">Historical range:</span>
+        <span class="range-values">
+          {{ summary.pessimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+          <span class="range-divider">—</span>
+          {{ summary.optimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+        </span>
+      </div>
+    }
+    
     <div class="hero-gain">
       <span class="gain-badge">
         +{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
         <span class="gain-percent">(+{{ summary.percentageGain | number: '1.1-1' }}%)</span>
       </span>
     </div>
+    
+    @if (!summary.hasRange) {
+      <div class="custom-rate-notice">
+        ⚠️ Using custom rate — no historical range available
+      </div>
+    }
   </div>
 
   <!-- Chart -->
@@ -30,6 +52,12 @@
       <div class="stat-icon">📈</div>
       <div class="stat-content">
         <div class="stat-value positive">{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+        @if (summary.hasRange && summary.pessimisticGain && summary.optimisticGain) {
+          <div class="stat-range">
+            {{ summary.pessimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }} — 
+            {{ summary.optimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+          </div>
+        }
         <div class="stat-label">Investment Returns</div>
       </div>
     </div>
@@ -46,6 +74,11 @@
       <div class="stat-icon">⚡</div>
       <div class="stat-content">
         <div class="stat-value positive">+{{ summary.percentageGain | number: '1.1-1' }}%</div>
+        @if (summary.hasRange && summary.pessimisticPercent !== undefined && summary.optimisticPercent !== undefined) {
+          <div class="stat-range">
+            +{{ summary.pessimisticPercent | number: '1.1-1' }}% — +{{ summary.optimisticPercent | number: '1.1-1' }}%
+          </div>
+        }
         <div class="stat-label">Total Return</div>
       </div>
     </div>

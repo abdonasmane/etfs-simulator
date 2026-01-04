@@ -9,12 +9,22 @@ import { CustomSelectComponent, SelectOption } from '../../../../shared/componen
 export interface SimulationFormData {
   initialInvestment: number;
   monthlyContribution: number;
-  annualReturnRate: number;
   contributionGrowthRate: number;
   mode: 'years' | 'target';
   years?: number;
   targetYear?: number;
   targetMonth?: number;
+  /** Index symbol (e.g., "SPY", "QQQ") - if provided, returns range projections */
+  indexSymbol?: string;
+  /** Annual return rate - only used when no indexSymbol is provided */
+  annualReturnRate?: number;
+}
+
+/**
+ * Index option with symbol for API and display value.
+ */
+interface IndexOption extends SelectOption {
+  symbol?: string;
 }
 
 /**
@@ -44,18 +54,18 @@ export class SimulationFormComponent {
   ];
 
   /** Options for expected annual return based on historical index performance */
-  returnOptions: SelectOption[] = [
-    { label: 'S&P 500 - 10.5%', value: 10.5, hint: 'since 1957' },
-    { label: 'MSCI World - 9%', value: 9, hint: 'since 1987' },
-    { label: 'NASDAQ 100 - 14%', value: 14, hint: 'since 1985' },
-    { label: 'Custom...', value: -1 },
+  returnOptions: IndexOption[] = [
+    { label: 'S&P 500', value: 1, hint: '~8.7% median (20yr rolling)', symbol: 'SPY' },
+    { label: 'NASDAQ 100', value: 2, hint: '~13.6% median (20yr rolling)', symbol: 'QQQ' },
+    { label: 'MSCI EAFE', value: 3, hint: '~5.7% median (20yr rolling)', symbol: 'EFA' },
+    { label: 'Custom rate...', value: -1 },
   ];
 
   /** Selected growth option value (-1 means custom) */
   selectedGrowthOption = 0;
 
-  /** Selected return option value (-1 means custom) */
-  selectedReturnOption = 9;
+  /** Selected return option value (-1 means custom, positive values are index IDs) */
+  selectedReturnOption = 1; // Default to S&P 500
 
   /** Available months for target date selection */
   monthOptions: SelectOption[] = [
@@ -79,12 +89,20 @@ export class SimulationFormComponent {
     this.form = this.fb.group({
       initialInvestment: [1000, [Validators.required, Validators.min(0)]],
       monthlyContribution: [500, [Validators.required, Validators.min(0)]],
-      annualReturnRate: [9, [Validators.required, Validators.min(0), Validators.max(100)]],
+      annualReturnRate: [7, [Validators.required, Validators.min(0), Validators.max(100)]], // Only used for custom
       contributionGrowthRate: [0, [Validators.required, Validators.min(0), Validators.max(20)]],
       years: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetYearsFromNow: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetMonth: [12, [Validators.required, Validators.min(1), Validators.max(12)]],
     });
+  }
+
+  /**
+   * Get the currently selected index symbol (if any).
+   */
+  get selectedIndexSymbol(): string | undefined {
+    const option = this.returnOptions.find(o => o.value === this.selectedReturnOption);
+    return option?.symbol;
   }
 
   /**
@@ -109,8 +127,9 @@ export class SimulationFormComponent {
    */
   onReturnOptionChange(value: number): void {
     this.selectedReturnOption = value;
-    if (value >= 0) {
-      this.form.patchValue({ annualReturnRate: value });
+    // When custom is selected, set default to 7%
+    if (value === -1) {
+      this.form.patchValue({ annualReturnRate: 7 });
     }
   }
 
@@ -147,10 +166,16 @@ export class SimulationFormComponent {
     const data: SimulationFormData = {
       initialInvestment: formValue.initialInvestment,
       monthlyContribution: formValue.monthlyContribution,
-      annualReturnRate: formValue.annualReturnRate,
       contributionGrowthRate: formValue.contributionGrowthRate,
       mode: this.mode,
     };
+
+    // Use index symbol if a predefined index is selected, otherwise use custom rate
+    if (this.selectedIndexSymbol) {
+      data.indexSymbol = this.selectedIndexSymbol;
+    } else {
+      data.annualReturnRate = formValue.annualReturnRate;
+    }
 
     if (this.mode === 'years') {
       data.years = formValue.years;

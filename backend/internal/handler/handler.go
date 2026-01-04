@@ -8,18 +8,21 @@ import (
 
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
+	"github.com/abdonasmane/etfs-simulator/backend/internal/marketdata"
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
 )
 
 // Handler is the main HTTP handler that routes requests.
 type Handler struct {
-	mux *http.ServeMux
+	mux          *http.ServeMux
+	indexService *marketdata.IndexService
 }
 
 // New creates a new Handler with all routes registered.
-func New() *Handler {
+func New(indexService *marketdata.IndexService) *Handler {
 	h := &Handler{
-		mux: http.NewServeMux(),
+		mux:          http.NewServeMux(),
+		indexService: indexService,
 	}
 
 	h.registerRoutes()
@@ -52,9 +55,12 @@ func (h *Handler) registerRoutes() {
 	// Health check
 	h.mux.HandleFunc("GET /health", handleHealth)
 
+	// Index data endpoints
+	h.mux.HandleFunc("GET /api/v1/indexes", h.handleGetIndexes)
+
 	// Simulation endpoints
-	h.mux.HandleFunc("POST /api/v1/simulate/years", handleSimulateByYears)
-	h.mux.HandleFunc("POST /api/v1/simulate/target", handleSimulateByTarget)
+	h.mux.HandleFunc("POST /api/v1/simulate/years", h.handleSimulateByYears)
+	h.mux.HandleFunc("POST /api/v1/simulate/target", h.handleSimulateByTarget)
 }
 
 // ErrorResponse is the standard error response.

@@ -68,40 +68,13 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     if (!ctx) return;
 
     const data = this.getChartData();
+    const datasets = this.buildDatasets(ctx, data);
 
     this.chart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: data.labels,
-        datasets: [
-          {
-            label: 'Portfolio Value',
-            data: data.portfolioValues,
-            borderColor: '#4361ee',
-            backgroundColor: this.createGradient(ctx, '#4361ee', 0.3),
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: '#4361ee',
-            pointHoverBorderColor: '#ffffff',
-            pointHoverBorderWidth: 2,
-          },
-          {
-            label: 'Total Contributed',
-            data: data.contributions,
-            borderColor: '#94a3b8',
-            backgroundColor: this.createGradient(ctx, '#94a3b8', 0.1),
-            fill: true,
-            tension: 0.4,
-            pointRadius: 0,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: '#94a3b8',
-            pointHoverBorderColor: '#ffffff',
-            pointHoverBorderWidth: 2,
-            borderDash: [5, 5],
-          },
-        ],
+        datasets,
       },
       options: {
         responsive: true,
@@ -181,26 +154,122 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       return;
     }
 
+    const ctx = this.chartCanvas.nativeElement.getContext('2d');
+    if (!ctx) return;
+
     const data = this.getChartData();
+    const datasets = this.buildDatasets(ctx, data);
+
     this.chart.data.labels = data.labels;
-    this.chart.data.datasets[0].data = data.portfolioValues;
-    this.chart.data.datasets[1].data = data.contributions;
+    this.chart.data.datasets = datasets;
     this.chart.update('none');
+  }
+
+  /**
+   * Build chart datasets, including range area if available.
+   */
+  private buildDatasets(
+    ctx: CanvasRenderingContext2D,
+    data: ReturnType<typeof this.getChartData>
+  ): Chart['data']['datasets'] {
+    const datasets: Chart['data']['datasets'] = [];
+
+    // If we have range data, add the confidence area first (so it's behind)
+    if (data.optimisticValues && data.pessimisticValues) {
+      // Optimistic line (upper bound) - will be filled down to pessimistic
+      datasets.push({
+        label: 'Optimistic',
+        data: data.optimisticValues,
+        borderColor: 'rgba(34, 197, 94, 0.4)', // Green
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 1,
+        borderDash: [4, 4],
+      });
+
+      // Pessimistic line (lower bound)
+      datasets.push({
+        label: 'Pessimistic',
+        data: data.pessimisticValues,
+        borderColor: 'rgba(239, 68, 68, 0.4)', // Red
+        backgroundColor: this.hexToRgba('#4361ee', 0.1), // Light blue fill
+        fill: '-1', // Fill to previous dataset (optimistic)
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderWidth: 1,
+        borderDash: [4, 4],
+      });
+    }
+
+    // Main portfolio value line (median)
+    datasets.push({
+      label: this.hasRangeData ? 'Expected (Median)' : 'Portfolio Value',
+      data: data.portfolioValues,
+      borderColor: '#4361ee',
+      backgroundColor: this.hasRangeData ? 'transparent' : this.createGradient(ctx, '#4361ee', 0.3),
+      fill: !this.hasRangeData,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointHoverBackgroundColor: '#4361ee',
+      pointHoverBorderColor: '#ffffff',
+      pointHoverBorderWidth: 2,
+      borderWidth: 2.5,
+    });
+
+    // Total contributed line
+    datasets.push({
+      label: 'Total Contributed',
+      data: data.contributions,
+      borderColor: '#94a3b8',
+      backgroundColor: this.createGradient(ctx, '#94a3b8', 0.1),
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 6,
+      pointHoverBackgroundColor: '#94a3b8',
+      pointHoverBorderColor: '#ffffff',
+      pointHoverBorderWidth: 2,
+      borderDash: [5, 5],
+    });
+
+    return datasets;
+  }
+
+  /**
+   * Check if projections have range data (pessimistic/optimistic values).
+   */
+  private get hasRangeData(): boolean {
+    return this.projections?.length > 0 && this.projections[0].pessimisticValue !== undefined;
   }
 
   private getChartData(): {
     labels: string[];
     portfolioValues: number[];
     contributions: number[];
+    pessimisticValues?: number[];
+    optimisticValues?: number[];
   } {
     // Sample data points for cleaner chart (show yearly or every 6 months)
     const sampledProjections = this.sampleProjections();
 
-    return {
+    const data: ReturnType<typeof this.getChartData> = {
       labels: sampledProjections.map(p => this.formatDate(p.year, p.month)),
       portfolioValues: sampledProjections.map(p => p.portfolioValue),
       contributions: sampledProjections.map(p => p.totalContributed),
     };
+
+    // Add range data if available
+    if (this.hasRangeData) {
+      data.pessimisticValues = sampledProjections.map(p => p.pessimisticValue!);
+      data.optimisticValues = sampledProjections.map(p => p.optimisticValue!);
+    }
+
+    return data;
   }
 
   private sampleProjections(): MonthProjection[] {

@@ -19,7 +19,10 @@ export interface SimulateByYearsRequest {
   /** Number of years to simulate (1-50) */
   years: number;
 
-  /** Expected annual return percentage (default: 7.0) */
+  /** Index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections. */
+  indexSymbol?: string;
+
+  /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol is provided. */
   annualReturnRate?: number;
 
   /** Annual percentage increase in contributions (default: 0) */
@@ -43,7 +46,10 @@ export interface SimulateByTargetRequest {
   /** Target month (1-12), defaults to December */
   targetMonth?: number;
 
-  /** Expected annual return percentage (default: 7.0) */
+  /** Index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections. */
+  indexSymbol?: string;
+
+  /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol is provided. */
   annualReturnRate?: number;
 
   /** Annual percentage increase in contributions (default: 0) */
@@ -68,8 +74,14 @@ export interface MonthProjection {
   /** Total amount contributed so far */
   totalContributed: number;
 
-  /** Current portfolio value */
+  /** Current portfolio value (median) */
   portfolioValue: number;
+
+  /** Pessimistic portfolio value (5th percentile) - only present when indexSymbol is used */
+  pessimisticValue?: number;
+
+  /** Optimistic portfolio value (95th percentile) - only present when indexSymbol is used */
+  optimisticValue?: number;
 }
 
 /**
@@ -93,16 +105,16 @@ export interface SimulateSummary {
   /** Human-readable target date (e.g., "December 2035") */
   targetDate: string;
 
-  /** Final portfolio value */
+  /** Final portfolio value (median) */
   finalValue: number;
 
   /** Total amount contributed */
   totalContributed: number;
 
-  /** Total gain */
+  /** Total gain (median) */
   totalGain: number;
 
-  /** Percentage gain */
+  /** Percentage gain (median) */
   percentageGain: number;
 
   /** Total number of months simulated */
@@ -113,6 +125,27 @@ export interface SimulateSummary {
 
   /** Contribution milestones showing how contributions grow over time */
   contributionMilestones: ContributionMilestone[];
+
+  /** Whether range data is available (true when indexSymbol was provided) */
+  hasRange: boolean;
+
+  /** Pessimistic final value (5th percentile) */
+  pessimisticValue?: number;
+
+  /** Optimistic final value (95th percentile) */
+  optimisticValue?: number;
+
+  /** Pessimistic gain */
+  pessimisticGain?: number;
+
+  /** Optimistic gain */
+  optimisticGain?: number;
+
+  /** Pessimistic percentage gain */
+  pessimisticPercent?: number;
+
+  /** Optimistic percentage gain */
+  optimisticPercent?: number;
 }
 
 /**
