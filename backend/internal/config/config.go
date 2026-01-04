@@ -63,7 +63,7 @@ func Load() (*Config, error) {
 	}
 
 	if err := cfg.validate(); errors.Check(err) {
-		return nil, fmt.Errorf("invalid configuration: %w", err)
+		return nil, errors.Wrap(err, "invalid configuration")
 	}
 
 	return cfg, nil
@@ -72,7 +72,7 @@ func Load() (*Config, error) {
 // validate checks that all configuration values are valid.
 func (c *Config) validate() error {
 	if c.Server.Port < 1 || c.Server.Port > 65535 {
-		return fmt.Errorf("server port must be between 1 and 65535, got %d", c.Server.Port)
+		return errors.Errorf("server port must be between 1 and 65535, got %d", c.Server.Port)
 	}
 
 	validEnvs := map[string]bool{
@@ -81,7 +81,7 @@ func (c *Config) validate() error {
 		"production":  true,
 	}
 	if !validEnvs[c.Env] {
-		return fmt.Errorf("invalid environment: %s (must be development, staging, or production)", c.Env)
+		return errors.Errorf("invalid environment: %s (must be development, staging, or production)", c.Env)
 	}
 
 	return nil

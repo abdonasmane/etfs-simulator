@@ -4,7 +4,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -83,7 +82,7 @@ func (s *Server) Run(ctx context.Context) error {
 	// Wait for either a server error, context cancellation, or shutdown signal
 	select {
 	case err := <-serverErrors:
-		return fmt.Errorf("server error: %w", err)
+		return errors.Wrap(err, "server error")
 
 	case <-ctx.Done():
 		slog.Info("context cancelled, initiating shutdown")
@@ -108,7 +107,7 @@ func (s *Server) shutdown() error {
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); errors.Check(err) {
-		return fmt.Errorf("graceful shutdown failed: %w", err)
+		return errors.Wrap(err, "graceful shutdown failed")
 	}
 
 	slog.Info("server stopped gracefully")
