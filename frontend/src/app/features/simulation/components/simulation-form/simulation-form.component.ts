@@ -2,6 +2,7 @@ import { Component, EventEmitter, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { CustomSelectComponent, SelectOption } from '../../../../shared/components/custom-select/custom-select.component';
+import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 
 /**
  * Form data emitted when user submits a simulation request.
@@ -34,7 +35,7 @@ interface IndexOption extends SelectOption {
 @Component({
   selector: 'app-simulation-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, CustomSelectComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, CustomSelectComponent, TooltipComponent],
   templateUrl: './simulation-form.component.html',
   styleUrl: './simulation-form.component.scss',
 })

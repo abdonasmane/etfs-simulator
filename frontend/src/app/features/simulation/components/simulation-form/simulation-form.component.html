@@ -22,7 +22,10 @@
   <form [formGroup]="form" (ngSubmit)="onSubmit()">
     <!-- Initial Investment -->
     <div class="form-group">
-      <label for="initialInvestment">Initial Investment</label>
+      <label for="initialInvestment">
+        Initial Investment
+        <app-tooltip text="The amount you start with. This could be savings you've already accumulated." />
+      </label>
       <div class="input-with-prefix">
         <span class="prefix">€</span>
         <input
@@ -37,7 +40,10 @@
 
     <!-- Monthly Contribution -->
     <div class="form-group">
-      <label for="monthlyContribution">Monthly Contribution</label>
+      <label for="monthlyContribution">
+        Monthly Contribution
+        <app-tooltip text="How much you'll invest each month. Consistency is key to long-term growth." />
+      </label>
       <div class="input-with-prefix">
         <span class="prefix">€</span>
         <input
@@ -52,7 +58,10 @@
 
     <!-- Contribution Growth Rate -->
     <div class="form-group">
-      <span class="field-label">Yearly Contribution Increase</span>
+      <span class="field-label">
+        Yearly Contribution Increase
+        <app-tooltip text="Increase your monthly contribution each year to keep up with inflation or salary growth. Even small increases compound significantly over time." position="left" />
+      </span>
       <app-custom-select
         [options]="growthOptions"
         [value]="selectedGrowthOption"
@@ -75,7 +84,10 @@
 
     <!-- Expected Annual Return -->
     <div class="form-group">
-      <span class="field-label">Expected Annual Return</span>
+      <span class="field-label">
+        Expected Annual Return
+        <app-tooltip text="Based on historical index performance. Past returns don't guarantee future results, but provide a reasonable estimate." position="left" />
+      </span>
       <app-custom-select
         [options]="returnOptions"
         [value]="selectedReturnOption"
@@ -102,7 +114,10 @@
       @if (mode === 'years') {
         <div class="form-group fade-in">
           <label for="years">
-            Investment Period
+            <span class="label-with-tooltip">
+              Investment Period
+              <app-tooltip text="The longer you invest, the more time compound interest has to grow your money. Even a few extra years make a big difference." />
+            </span>
             <span class="slider-value">{{ form.value.years }} years</span>
           </label>
           <input
@@ -124,7 +139,10 @@
       @if (mode === 'target') {
         <div class="form-group fade-in">
           <label for="targetYearsFromNow">
-            Target Date
+            <span class="label-with-tooltip">
+              Target Date
+              <app-tooltip text="When do you need the money? This could be retirement, a home purchase, or any financial goal." />
+            </span>
             <span class="slider-value">{{ targetYear }} ({{ form.value.targetYearsFromNow }} years)</span>
           </label>
           <input
