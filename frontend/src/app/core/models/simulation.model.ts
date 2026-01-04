@@ -13,7 +13,7 @@ export interface SimulateByYearsRequest {
   /** Starting investment amount */
   initialInvestment: number;
 
-  /** Amount added each month */
+  /** Starting monthly contribution amount */
   monthlyContribution: number;
 
   /** Number of years to simulate (1-50) */
@@ -21,6 +21,9 @@ export interface SimulateByYearsRequest {
 
   /** Expected annual return percentage (default: 7.0) */
   annualReturnRate?: number;
+
+  /** Annual percentage increase in contributions (default: 0) */
+  contributionGrowthRate?: number;
 }
 
 /**
@@ -31,7 +34,7 @@ export interface SimulateByTargetRequest {
   /** Starting investment amount */
   initialInvestment: number;
 
-  /** Amount added each month */
+  /** Starting monthly contribution amount */
   monthlyContribution: number;
 
   /** Target year (e.g., 2035) */
@@ -42,6 +45,9 @@ export interface SimulateByTargetRequest {
 
   /** Expected annual return percentage (default: 7.0) */
   annualReturnRate?: number;
+
+  /** Annual percentage increase in contributions (default: 0) */
+  contributionGrowthRate?: number;
 }
 
 // --- Response Types ---
@@ -56,11 +62,28 @@ export interface MonthProjection {
   /** Month (1-12) */
   month: number;
 
+  /** Monthly contribution for this month */
+  monthlyContribution: number;
+
   /** Total amount contributed so far */
   totalContributed: number;
 
   /** Current portfolio value */
   portfolioValue: number;
+}
+
+/**
+ * Contribution milestone showing the monthly contribution at key years.
+ */
+export interface ContributionMilestone {
+  /** The year */
+  year: number;
+
+  /** Years from now */
+  yearsFromNow: number;
+
+  /** Monthly contribution at this point */
+  monthlyContribution: number;
 }
 
 /**
@@ -76,7 +99,7 @@ export interface SimulateSummary {
   /** Total amount contributed */
   totalContributed: number;
 
-  /** Total gain (finalValue - totalContributed) */
+  /** Total gain */
   totalGain: number;
 
   /** Percentage gain */
@@ -84,6 +107,12 @@ export interface SimulateSummary {
 
   /** Total number of months simulated */
   totalMonths: number;
+
+  /** Final monthly contribution amount */
+  finalMonthlyContribution: number;
+
+  /** Contribution milestones showing how contributions grow over time */
+  contributionMilestones: ContributionMilestone[];
 }
 
 /**

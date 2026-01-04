@@ -44,6 +44,7 @@ Chart.register(...registerables);
 })
 export class GrowthChartComponent implements AfterViewInit, OnChanges {
   @Input({ required: true }) projections!: MonthProjection[];
+
   @ViewChild('chartCanvas') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
   private chart: Chart | null = null;

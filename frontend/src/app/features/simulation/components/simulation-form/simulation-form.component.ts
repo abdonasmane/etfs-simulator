@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 
 /**
  * Form data emitted when user submits a simulation request.
@@ -9,10 +9,20 @@ export interface SimulationFormData {
   initialInvestment: number;
   monthlyContribution: number;
   annualReturnRate: number;
+  contributionGrowthRate: number;
   mode: 'years' | 'target';
   years?: number;
   targetYear?: number;
   targetMonth?: number;
+}
+
+/**
+ * Option for contribution growth rate dropdown.
+ * Use value = -1 for "Custom" option.
+ */
+interface GrowthOption {
+  label: string;
+  value: number;
 }
 
 /**
@@ -22,7 +32,7 @@ export interface SimulationFormData {
 @Component({
   selector: 'app-simulation-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './simulation-form.component.html',
   styleUrl: './simulation-form.component.scss',
 })
@@ -32,6 +42,17 @@ export class SimulationFormComponent {
   form: FormGroup;
   mode: 'years' | 'target' = 'years';
   currentYear = new Date().getFullYear();
+
+  /** Options for contribution growth rate dropdown */
+  growthOptions: GrowthOption[] = [
+    { label: 'None - fixed contribution', value: 0 },
+    { label: '+2.5%/year (typical inflation)', value: 2.5 },
+    { label: '+4%/year (typical salary growth)', value: 4 },
+    { label: 'Custom...', value: -1 },
+  ];
+
+  /** Selected growth option value (-1 means custom) */
+  selectedGrowthOption = 0;
 
   /** Available months for target date selection */
   months = [
@@ -56,6 +77,7 @@ export class SimulationFormComponent {
       initialInvestment: [1000, [Validators.required, Validators.min(0)]],
       monthlyContribution: [500, [Validators.required, Validators.min(0)]],
       annualReturnRate: [7, [Validators.required, Validators.min(0), Validators.max(100)]],
+      contributionGrowthRate: [0, [Validators.required, Validators.min(0), Validators.max(20)]],
       years: [10, [Validators.required, Validators.min(1), Validators.max(50)]],
       targetYear: [this.currentYear + 10, [Validators.required, Validators.min(this.currentYear + 1)]],
       targetMonth: [12, [Validators.required, Validators.min(1), Validators.max(12)]],
@@ -67,6 +89,25 @@ export class SimulationFormComponent {
    */
   setMode(mode: 'years' | 'target'): void {
     this.mode = mode;
+  }
+
+  /**
+   * Handle growth option selection from dropdown.
+   */
+  onGrowthOptionChange(value: number): void {
+    this.selectedGrowthOption = value;
+    if (value >= 0) {
+      // Preset selected - apply the value
+      this.form.patchValue({ contributionGrowthRate: value });
+    }
+    // If custom (-1), keep the current form value and show input
+  }
+
+  /**
+   * Check if custom growth rate input should be shown.
+   */
+  get isCustomGrowth(): boolean {
+    return this.selectedGrowthOption === -1;
   }
 
   /**
@@ -82,6 +123,7 @@ export class SimulationFormComponent {
       initialInvestment: formValue.initialInvestment,
       monthlyContribution: formValue.monthlyContribution,
       annualReturnRate: formValue.annualReturnRate,
+      contributionGrowthRate: formValue.contributionGrowthRate,
       mode: this.mode,
     };
 

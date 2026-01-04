@@ -57,6 +57,7 @@ export class SimulationPageComponent {
           monthlyContribution: data.monthlyContribution,
           years: data.years,
           annualReturnRate: data.annualReturnRate,
+          contributionGrowthRate: data.contributionGrowthRate,
         })
         .subscribe({
           next: response => {
@@ -75,6 +76,7 @@ export class SimulationPageComponent {
           targetYear: data.targetYear,
           targetMonth: data.targetMonth,
           annualReturnRate: data.annualReturnRate,
+          contributionGrowthRate: data.contributionGrowthRate,
         })
         .subscribe({
           next: response => {

@@ -12,6 +12,7 @@
   text-align: center;
   color: white;
   box-shadow: 0 10px 40px rgba(67, 97, 238, 0.3);
+  transition: all 0.3s ease;
 
   .hero-label {
     font-size: 0.95rem;
@@ -24,10 +25,16 @@
     font-weight: 700;
     letter-spacing: -1px;
     margin-bottom: 0.75rem;
+    transition: transform 0.3s ease, opacity 0.3s ease;
 
     @media (max-width: 600px) {
       font-size: 2.25rem;
     }
+  }
+
+  // Animation class for value changes
+  &.value-changing .hero-value {
+    animation: valueChange 0.4s ease-out;
   }
 
   .hero-gain {
@@ -85,6 +92,8 @@
     font-size: 1.1rem;
     font-weight: 700;
     color: #1a1a2e;
+    transition: all 0.3s ease;
+    white-space: nowrap;
 
     &.positive {
       color: #10b981;
@@ -95,7 +104,145 @@
     font-size: 0.75rem;
     color: #64748b;
     margin-top: 0.125rem;
+    white-space: nowrap;
   }
+}
+
+// Contribution Milestones
+.milestones-section {
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+.milestones-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: #f8fafc;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1a1a2e;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+
+    .milestone-icon {
+      font-size: 1.1rem;
+    }
+  }
+
+  .milestone-summary {
+    flex: 1;
+    font-size: 0.85rem;
+    color: #10b981;
+    font-weight: 600;
+  }
+
+  .expand-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: #f1f5f9;
+    border-radius: 6px;
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background: #e2e8f0;
+      color: #1a1a2e;
+    }
+  }
+
+  &:focus {
+    outline: 2px solid #4361ee;
+    outline-offset: 2px;
+  }
+}
+
+.milestones-grid {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 1.25rem 1.25rem;
+  overflow-x: auto;
+  border-top: 1px solid #f1f5f9;
+}
+
+.milestone-card {
+  flex-shrink: 0;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  text-align: center;
+  min-width: 90px;
+
+  .milestone-year {
+    font-size: 0.7rem;
+    color: #64748b;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+  }
+
+  .milestone-value {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1a1a2e;
+  }
+}
+
+// Fade in animation
+.fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// Value change animation (pulse effect)
+@keyframes valueChange {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  30% {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// Animation trigger class
+.animate-value {
+  animation: valueChange 0.35s ease-out;
 }
 
 // Projections Table

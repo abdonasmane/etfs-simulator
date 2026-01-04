@@ -29,7 +29,10 @@
             </div>
           }
           <div class="results-content">
-            <app-simulation-results [summary]="summary()!" [projections]="projections()" />
+            <app-simulation-results 
+              [summary]="summary()!" 
+              [projections]="projections()"
+            />
           </div>
         </div>
       } @else if (loading()) {

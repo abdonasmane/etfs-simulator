@@ -1,7 +1,9 @@
 <div class="simulation-results">
   <!-- Hero Result -->
   <div class="hero-result">
-    <div class="hero-label">Projected Portfolio Value by {{ summary.targetDate }}</div>
+    <div class="hero-label">
+      Projected Portfolio Value by {{ summary.targetDate }}
+    </div>
     <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
     <div class="hero-gain">
       <span class="gain-badge">
@@ -48,6 +50,45 @@
       </div>
     </div>
   </div>
+
+  <!-- Contribution Milestones -->
+  @if (hasContributionGrowth) {
+    <div class="milestones-section">
+      <div 
+      class="milestones-header" 
+      (click)="toggleMilestones()"
+      (keydown.enter)="toggleMilestones()"
+      (keydown.space)="toggleMilestones()"
+      tabindex="0"
+      role="button"
+      [attr.aria-expanded]="showMilestones"
+    >
+        <h3>
+          <span class="milestone-icon">📊</span>
+          Contribution Growth
+        </h3>
+        <span class="milestone-summary">
+          €{{ summary.contributionMilestones[0]?.monthlyContribution | number: '1.0-0' }}/mo 
+          → 
+          €{{ summary.finalMonthlyContribution | number: '1.0-0' }}/mo
+        </span>
+        <button class="expand-btn">
+          {{ showMilestones ? '−' : '+' }}
+        </button>
+      </div>
+      
+      @if (showMilestones) {
+        <div class="milestones-grid" @expandCollapse>
+          @for (milestone of summary.contributionMilestones; track milestone.year) {
+            <div class="milestone-card">
+              <div class="milestone-year">Year {{ milestone.yearsFromNow }}</div>
+              <div class="milestone-value">€{{ milestone.monthlyContribution | number: '1.0-0' }}/mo</div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
 
   <!-- Projections Table -->
   <div class="projections-section">
