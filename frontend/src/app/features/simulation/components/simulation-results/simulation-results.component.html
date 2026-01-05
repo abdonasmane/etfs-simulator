@@ -35,6 +35,38 @@
     }
   </div>
 
+  <!-- Portfolio Breakdown (when using custom portfolio) -->
+  @if (summary.portfolio && summary.portfolio.length > 1) {
+    <div class="portfolio-breakdown">
+      <div class="portfolio-header">
+        <span class="portfolio-title">Your Portfolio Mix</span>
+        @if (summary.blendedMedianReturn) {
+          <span class="blended-return">~{{ summary.blendedMedianReturn | number: '1.1-1' }}% blended return</span>
+        }
+      </div>
+      <div class="portfolio-bar">
+        @for (etf of summary.portfolio; track etf.symbol) {
+          <div 
+            class="bar-segment" 
+            [style.width.%]="etf.weight"
+            [style.background]="getETFColor(etf.symbol)"
+            [title]="etf.name + ': ' + etf.weight + '%'"
+          ></div>
+        }
+      </div>
+      <div class="portfolio-legend">
+        @for (etf of summary.portfolio; track etf.symbol) {
+          <div class="legend-item">
+            <span class="legend-color" [style.background]="getETFColor(etf.symbol)"></span>
+            <span class="legend-name">{{ etf.name }}</span>
+            <span class="legend-weight">{{ etf.weight }}%</span>
+            <span class="legend-return">({{ etf.medianReturn | number: '1.1-1' }}%)</span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
   <!-- Chart -->
   <app-growth-chart [projections]="projections" />
 

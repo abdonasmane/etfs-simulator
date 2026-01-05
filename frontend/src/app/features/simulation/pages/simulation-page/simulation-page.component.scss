@@ -34,14 +34,14 @@
   gap: 0.625rem;
 
   .brand-logo {
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 110px;
+    height: 110px;
+    border-radius: 10px;
 
     @media (max-width: 600px) {
-      width: 36px;
-      height: 36px;
-      border-radius: 6px;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
     }
   }
 

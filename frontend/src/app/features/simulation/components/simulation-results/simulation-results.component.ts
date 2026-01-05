@@ -82,4 +82,18 @@ export class SimulationResultsComponent {
   get hasContributionGrowth(): boolean {
     return this.summary.contributionMilestones && this.summary.contributionMilestones.length > 0;
   }
+
+  /** ETF color map for portfolio visualization */
+  private readonly etfColors: Record<string, string> = {
+    SPY: '#4361ee',
+    QQQ: '#7c3aed',
+    EFA: '#0891b2',
+  };
+
+  /**
+   * Get color for an ETF symbol.
+   */
+  getETFColor(symbol: string): string {
+    return this.etfColors[symbol] || '#64748b';
+  }
 }

@@ -3,6 +3,10 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
 import { CustomSelectComponent, SelectOption } from '../../../../shared/components/custom-select/custom-select.component';
 import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
+import {
+  PortfolioAllocatorComponent,
+  AllocationOutput,
+} from '../../../../shared/components/portfolio-allocator/portfolio-allocator.component';
 
 /**
  * Form data emitted when user submits a simulation request.
@@ -15,9 +19,11 @@ export interface SimulationFormData {
   years?: number;
   targetYear?: number;
   targetMonth?: number;
+  /** Portfolio allocations - if provided, returns blended range projections */
+  portfolio?: AllocationOutput[];
   /** Index symbol (e.g., "SPY", "QQQ") - if provided, returns range projections */
   indexSymbol?: string;
-  /** Annual return rate - only used when no indexSymbol is provided */
+  /** Annual return rate - only used when no indexSymbol or portfolio is provided */
   annualReturnRate?: number;
 }
 
@@ -35,7 +41,7 @@ interface IndexOption extends SelectOption {
 @Component({
   selector: 'app-simulation-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, CustomSelectComponent, TooltipComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, CustomSelectComponent, TooltipComponent, PortfolioAllocatorComponent],
   templateUrl: './simulation-form.component.html',
   styleUrl: './simulation-form.component.scss',
 })
@@ -59,6 +65,7 @@ export class SimulationFormComponent {
     { label: 'S&P 500', value: 1, hint: '~8.7% median (20yr rolling)', symbol: 'SPY' },
     { label: 'NASDAQ 100', value: 2, hint: '~13.6% median (20yr rolling)', symbol: 'QQQ' },
     { label: 'MSCI EAFE', value: 3, hint: '~5.7% median (20yr rolling)', symbol: 'EFA' },
+    { label: 'Custom Portfolio', value: -2, hint: 'Mix multiple ETFs' },
     { label: 'Custom rate...', value: -1 },
   ];
 
@@ -82,6 +89,13 @@ export class SimulationFormComponent {
     { value: 10, label: 'October' },
     { value: 11, label: 'November' },
     { value: 12, label: 'December' },
+  ];
+
+  /** Current portfolio allocations (for custom portfolio mode) */
+  portfolioAllocations: AllocationOutput[] = [
+    { symbol: 'SPY', weight: 60 },
+    { symbol: 'QQQ', weight: 30 },
+    { symbol: 'EFA', weight: 10 },
   ];
 
   private readonly fb = inject(FormBuilder);
@@ -149,6 +163,21 @@ export class SimulationFormComponent {
   }
 
   /**
+   * Check if custom portfolio mode is active.
+   */
+  get isCustomPortfolio(): boolean {
+    return this.selectedReturnOption === -2;
+  }
+
+  /**
+   * Check if portfolio allocations are valid (sum to 100).
+   */
+  get isPortfolioValid(): boolean {
+    const total = this.portfolioAllocations.reduce((sum, a) => sum + a.weight, 0);
+    return total === 100;
+  }
+
+  /**
    * Get the target year based on years from now.
    */
   get targetYear(): number {
@@ -156,10 +185,22 @@ export class SimulationFormComponent {
   }
 
   /**
+   * Handle portfolio allocations change.
+   */
+  onPortfolioChange(allocations: AllocationOutput[]): void {
+    this.portfolioAllocations = allocations;
+  }
+
+  /**
    * Submit the form and emit simulation data.
    */
   onSubmit(): void {
     if (this.form.invalid) {
+      return;
+    }
+
+    // Validate portfolio if in portfolio mode
+    if (this.isCustomPortfolio && !this.isPortfolioValid) {
       return;
     }
 
@@ -171,8 +212,10 @@ export class SimulationFormComponent {
       mode: this.mode,
     };
 
-    // Use index symbol if a predefined index is selected, otherwise use custom rate
-    if (this.selectedIndexSymbol) {
+    // Determine return source: portfolio > index symbol > custom rate
+    if (this.isCustomPortfolio) {
+      data.portfolio = this.portfolioAllocations;
+    } else if (this.selectedIndexSymbol) {
       data.indexSymbol = this.selectedIndexSymbol;
     } else {
       data.annualReturnRate = formValue.annualReturnRate;

@@ -12,6 +12,15 @@ import (
 
 // --- Request Types ---
 
+// PortfolioAllocation represents an ETF and its weight in a portfolio.
+type PortfolioAllocation struct {
+	// Symbol is the ETF symbol (e.g., "SPY", "QQQ", "EFA").
+	Symbol string `json:"symbol" example:"SPY"`
+
+	// Weight is the allocation percentage (0-100). All weights must sum to 100.
+	Weight float64 `json:"weight" example:"60"`
+}
+
 // SimulateByYearsRequest is the input for simulating by number of years.
 type SimulateByYearsRequest struct {
 	// InitialInvestment is the starting amount.
@@ -23,10 +32,14 @@ type SimulateByYearsRequest struct {
 	// Years is the number of years to simulate (1-50).
 	Years int `json:"years" example:"10"`
 
+	// Portfolio is a list of ETF allocations. If provided, calculates blended returns with range.
+	Portfolio []PortfolioAllocation `json:"portfolio,omitempty"`
+
 	// IndexSymbol is the market index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections.
+	// Ignored if Portfolio is provided.
 	IndexSymbol *string `json:"indexSymbol,omitempty" example:"SPY"`
 
-	// AnnualReturnRate is the expected annual return percentage (default: 7.0). Ignored if IndexSymbol is provided.
+	// AnnualReturnRate is the expected annual return percentage (default: 7.0). Ignored if IndexSymbol or Portfolio is provided.
 	AnnualReturnRate *float64 `json:"annualReturnRate,omitempty" example:"7.0"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
@@ -47,10 +60,14 @@ type SimulateByTargetRequest struct {
 	// TargetMonth is the target month (1-12). Defaults to 12 (December).
 	TargetMonth *int `json:"targetMonth,omitempty" example:"6"`
 
+	// Portfolio is a list of ETF allocations. If provided, calculates blended returns with range.
+	Portfolio []PortfolioAllocation `json:"portfolio,omitempty"`
+
 	// IndexSymbol is the market index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections.
+	// Ignored if Portfolio is provided.
 	IndexSymbol *string `json:"indexSymbol,omitempty" example:"SPY"`
 
-	// AnnualReturnRate is the expected annual return percentage (default: 7.0). Ignored if IndexSymbol is provided.
+	// AnnualReturnRate is the expected annual return percentage (default: 7.0). Ignored if IndexSymbol or Portfolio is provided.
 	AnnualReturnRate *float64 `json:"annualReturnRate,omitempty" example:"7.0"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
@@ -79,6 +96,14 @@ type ContributionMilestone struct {
 	MonthlyContribution float64 `json:"monthlyContribution" example:"608.33"`
 }
 
+// PortfolioBreakdown shows the allocation and expected return for each ETF.
+type PortfolioBreakdown struct {
+	Symbol       string  `json:"symbol" example:"SPY"`
+	Name         string  `json:"name" example:"S&P 500"`
+	Weight       float64 `json:"weight" example:"60"`
+	MedianReturn float64 `json:"medianReturn" example:"8.7"`
+}
+
 // SimulateSummary contains the final simulation results.
 type SimulateSummary struct {
 	TargetDate               string  `json:"targetDate" example:"December 2035"`
@@ -92,7 +117,7 @@ type SimulateSummary struct {
 	// ContributionMilestones shows how contributions grow over time.
 	ContributionMilestones []ContributionMilestone `json:"contributionMilestones"`
 
-	// Range values (only present when IndexSymbol is provided)
+	// Range values (only present when IndexSymbol or Portfolio is provided)
 	HasRange           bool     `json:"hasRange"`
 	PessimisticValue   *float64 `json:"pessimisticValue,omitempty" example:"85000.00"`
 	OptimisticValue    *float64 `json:"optimisticValue,omitempty" example:"125000.00"`
@@ -100,6 +125,10 @@ type SimulateSummary struct {
 	OptimisticGain     *float64 `json:"optimisticGain,omitempty" example:"64000.00"`
 	PessimisticPercent *float64 `json:"pessimisticPercent,omitempty" example:"39.3"`
 	OptimisticPercent  *float64 `json:"optimisticPercent,omitempty" example:"104.9"`
+
+	// Portfolio breakdown (only present when Portfolio is provided)
+	Portfolio           []PortfolioBreakdown `json:"portfolio,omitempty"`
+	BlendedMedianReturn *float64             `json:"blendedMedianReturn,omitempty" example:"9.2"`
 }
 
 // SimulateByYearsResponse is the output for years-based simulation.
@@ -150,9 +179,24 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Get index info if symbol provided
+	// Determine return rates: Portfolio > IndexSymbol > AnnualReturnRate
 	var indexInfo *indexReturnRates
-	if req.IndexSymbol != nil && *req.IndexSymbol != "" {
+	var portfolioBreakdown []PortfolioBreakdown
+	var blendedMedian *float64
+
+	if len(req.Portfolio) > 0 {
+		// Portfolio takes precedence
+		result, err := h.calculatePortfolioRates(req.Portfolio)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		indexInfo = &result.rates
+		portfolioBreakdown = result.breakdown
+		median := round1(result.rates.median)
+		blendedMedian = &median
+	} else if req.IndexSymbol != nil && *req.IndexSymbol != "" {
+		// Single index
 		info, ok := h.indexService.GetIndex(*req.IndexSymbol)
 		if !ok {
 			respondError(w, http.StatusBadRequest, "unknown index symbol: "+*req.IndexSymbol)
@@ -207,6 +251,11 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 			contributionGrowth,
 			endYear, endMonth,
 		)
+		// Add portfolio info if applicable
+		if portfolioBreakdown != nil {
+			summary.Portfolio = portfolioBreakdown
+			summary.BlendedMedianReturn = blendedMedian
+		}
 	} else {
 		// Single simulation
 		projections = simulateMonthly(
@@ -297,9 +346,24 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Get index info if symbol provided
+	// Determine return rates: Portfolio > IndexSymbol > AnnualReturnRate
 	var indexInfo *indexReturnRates
-	if req.IndexSymbol != nil && *req.IndexSymbol != "" {
+	var portfolioBreakdown []PortfolioBreakdown
+	var blendedMedian *float64
+
+	if len(req.Portfolio) > 0 {
+		// Portfolio takes precedence
+		result, err := h.calculatePortfolioRates(req.Portfolio)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		indexInfo = &result.rates
+		portfolioBreakdown = result.breakdown
+		median := round1(result.rates.median)
+		blendedMedian = &median
+	} else if req.IndexSymbol != nil && *req.IndexSymbol != "" {
+		// Single index
 		info, ok := h.indexService.GetIndex(*req.IndexSymbol)
 		if !ok {
 			respondError(w, http.StatusBadRequest, "unknown index symbol: "+*req.IndexSymbol)
@@ -345,6 +409,11 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 			contributionGrowth,
 			req.TargetYear, endMonth,
 		)
+		// Add portfolio info if applicable
+		if portfolioBreakdown != nil {
+			summary.Portfolio = portfolioBreakdown
+			summary.BlendedMedianReturn = blendedMedian
+		}
 	} else {
 		// Single simulation
 		projections = simulateMonthly(
@@ -518,6 +587,63 @@ type indexReturnRates struct {
 	median      float64
 	pessimistic float64
 	optimistic  float64
+}
+
+// portfolioResult holds the blended rates and breakdown for a portfolio.
+type portfolioResult struct {
+	rates     indexReturnRates
+	breakdown []PortfolioBreakdown
+}
+
+// calculatePortfolioRates calculates weighted average returns for a portfolio.
+func (h *Handler) calculatePortfolioRates(allocations []PortfolioAllocation) (*portfolioResult, error) {
+	if len(allocations) == 0 {
+		return nil, errors.New("portfolio cannot be empty")
+	}
+
+	// Validate weights sum to 100
+	var totalWeight float64
+	for _, a := range allocations {
+		if a.Weight <= 0 {
+			return nil, errors.New("weight must be positive for symbol: " + a.Symbol)
+		}
+		totalWeight += a.Weight
+	}
+	if math.Abs(totalWeight-100) > 0.01 {
+		return nil, errors.New("portfolio weights must sum to 100")
+	}
+
+	// Calculate weighted average rates
+	var medianSum, pessSum, optSum float64
+	breakdown := make([]PortfolioBreakdown, 0, len(allocations))
+
+	for _, a := range allocations {
+		info, ok := h.indexService.GetIndex(a.Symbol)
+		if !ok {
+			return nil, errors.New("unknown index symbol: " + a.Symbol)
+		}
+
+		weight := a.Weight / 100.0 // Convert to decimal
+		medianSum += info.MedianReturn * weight
+		pessSum += info.PessimisticReturn * weight
+		optSum += info.OptimisticReturn * weight
+
+		breakdown = append(breakdown, PortfolioBreakdown{
+			Symbol:       a.Symbol,
+			Name:         info.Name,
+			Weight:       a.Weight,
+			MedianReturn: round1(info.MedianReturn),
+		})
+	}
+
+	return &portfolioResult{
+		rates: indexReturnRates{
+			median:      medianSum,
+			pessimistic: pessSum,
+			optimistic:  optSum,
+		},
+		breakdown: breakdown,
+	}, nil
 }
 
 // simulateWithRange runs three simulations (pessimistic, median, optimistic) and merges results.

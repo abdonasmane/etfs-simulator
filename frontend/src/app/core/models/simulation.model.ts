@@ -3,6 +3,36 @@
  * These types match the backend Go structs exactly.
  */
 
+// --- Portfolio Types ---
+
+/**
+ * Represents an ETF allocation in a portfolio.
+ */
+export interface PortfolioAllocation {
+  /** ETF symbol (e.g., "SPY", "QQQ", "EFA") */
+  symbol: string;
+
+  /** Allocation percentage (0-100). All weights must sum to 100. */
+  weight: number;
+}
+
+/**
+ * Portfolio breakdown showing allocation and expected return for each ETF.
+ */
+export interface PortfolioBreakdown {
+  /** ETF symbol */
+  symbol: string;
+
+  /** ETF name (e.g., "S&P 500") */
+  name: string;
+
+  /** Allocation percentage */
+  weight: number;
+
+  /** Median return for this ETF */
+  medianReturn: number;
+}
+
 // --- Request Types ---
 
 /**
@@ -19,10 +49,13 @@ export interface SimulateByYearsRequest {
   /** Number of years to simulate (1-50) */
   years: number;
 
-  /** Index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections. */
+  /** Portfolio allocations. If provided, calculates blended returns with range. */
+  portfolio?: PortfolioAllocation[];
+
+  /** Index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections. Ignored if portfolio is provided. */
   indexSymbol?: string;
 
-  /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol is provided. */
+  /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol or portfolio is provided. */
   annualReturnRate?: number;
 
   /** Annual percentage increase in contributions (default: 0) */
@@ -46,10 +79,13 @@ export interface SimulateByTargetRequest {
   /** Target month (1-12), defaults to December */
   targetMonth?: number;
 
-  /** Index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections. */
+  /** Portfolio allocations. If provided, calculates blended returns with range. */
+  portfolio?: PortfolioAllocation[];
+
+  /** Index symbol (e.g., "SPY", "QQQ"). If provided, returns range projections. Ignored if portfolio is provided. */
   indexSymbol?: string;
 
-  /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol is provided. */
+  /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol or portfolio is provided. */
   annualReturnRate?: number;
 
   /** Annual percentage increase in contributions (default: 0) */
@@ -126,7 +162,7 @@ export interface SimulateSummary {
   /** Contribution milestones showing how contributions grow over time */
   contributionMilestones: ContributionMilestone[];
 
-  /** Whether range data is available (true when indexSymbol was provided) */
+  /** Whether range data is available (true when indexSymbol or portfolio was provided) */
   hasRange: boolean;
 
   /** Pessimistic final value (5th percentile) */
@@ -146,6 +182,12 @@ export interface SimulateSummary {
 
   /** Optimistic percentage gain */
   optimisticPercent?: number;
+
+  /** Portfolio breakdown (only present when portfolio was provided) */
+  portfolio?: PortfolioBreakdown[];
+
+  /** Blended median return for portfolio */
+  blendedMedianReturn?: number;
 }
 
 /**
