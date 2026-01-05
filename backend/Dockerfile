@@ -1,7 +1,7 @@
 # Build stage
 FROM golang:alpine AS builder
 
-# Enable auto toolchain to download required Go version
+# Enable auto toolchain for latest Go version
 ENV GOTOOLCHAIN=auto
 
 # Install swag for swagger generation
@@ -19,19 +19,23 @@ COPY . .
 # Generate swagger docs
 RUN swag init -g cmd/api/main.go -o docs --parseDependency --parseInternal
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api
+# Build the binary with optimizations for smaller size
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /api ./cmd/api
 
 # Runtime stage
 FROM alpine:3.21
 
-# Add ca-certificates for HTTPS calls
-RUN apk --no-cache add ca-certificates
+# Add ca-certificates for HTTPS calls and create non-root user
+RUN apk --no-cache add ca-certificates && \
+    adduser -D -g '' appuser
 
 WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /api .
+
+# Use non-root user for security
+USER appuser
 
 # Expose port
 EXPOSE 8080
