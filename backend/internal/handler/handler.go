@@ -9,6 +9,7 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"github.com/abdonasmane/etfs-simulator/backend/internal/marketdata"
+	"github.com/abdonasmane/etfs-simulator/backend/internal/metrics"
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
 )
 
@@ -16,20 +17,22 @@ import (
 type Handler struct {
 	mux          *http.ServeMux
 	indexService *marketdata.IndexService
+	metrics      *metrics.Metrics
 }
 
 // New creates a new Handler with all routes registered.
-func New(indexService *marketdata.IndexService) *Handler {
+func New(indexService *marketdata.IndexService, m *metrics.Metrics) *Handler {
 	h := &Handler{
 		mux:          http.NewServeMux(),
 		indexService: indexService,
+		metrics:      m,
 	}
 
 	h.registerRoutes()
 	return h
 }
 
-// ServeHTTP implements the http.Handler interface with CORS support.
+// ServeHTTP implements the http.Handler interface with CORS support and metrics.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Set CORS headers for all requests
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -42,7 +45,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.mux.ServeHTTP(w, r)
+	// Apply metrics middleware
+	h.metrics.Middleware(h.mux).ServeHTTP(w, r)
 }
 
 // registerRoutes sets up all API routes.
@@ -54,6 +58,9 @@ func (h *Handler) registerRoutes() {
 
 	// Health check
 	h.mux.HandleFunc("GET /health", handleHealth)
+
+	// Prometheus metrics
+	h.mux.Handle("GET /metrics", metrics.Handler())
 
 	// Index data endpoints
 	h.mux.HandleFunc("GET /api/v1/indexes", h.handleGetIndexes)

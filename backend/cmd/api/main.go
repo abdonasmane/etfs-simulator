@@ -20,6 +20,7 @@ import (
 	"github.com/abdonasmane/etfs-simulator/backend/internal/config"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/handler"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/marketdata"
+	"github.com/abdonasmane/etfs-simulator/backend/internal/metrics"
 	"github.com/abdonasmane/etfs-simulator/backend/internal/server"
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/logger"
@@ -61,8 +62,11 @@ func run() error {
 		)
 	}
 
+	// Initialize Prometheus metrics
+	m := metrics.New()
+
 	// Create HTTP handler
-	h := handler.New(indexService)
+	h := handler.New(indexService, m)
 
 	// Create and start server
 	srv := server.New(server.Options{
