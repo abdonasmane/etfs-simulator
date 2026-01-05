@@ -137,6 +137,7 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        devicePixelRatio: Math.max(window.devicePixelRatio || 1, 2),
         interaction: {
           mode: 'index',
           intersect: false,
