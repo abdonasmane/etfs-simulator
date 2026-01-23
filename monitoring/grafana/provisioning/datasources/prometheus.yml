@@ -4,6 +4,7 @@ datasources:
   - name: Prometheus
     type: prometheus
     access: proxy
-    url: PROMETHEUS_URL_PLACEHOLDER
+    url: https://etfs-prometheus.onrender.com
+    uid: prometheus
     isDefault: true
     editable: false
