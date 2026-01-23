@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  # Backend - full Prometheus metrics
+  - job_name: 'etfs-backend'
+    scheme: https
+    static_configs:
+      - targets: ['BACKEND_HOST_PLACEHOLDER']
+    metrics_path: /metrics
+
+  # Frontend - just check if it's reachable (up/down)
+  - job_name: 'etfs-frontend'
+    scheme: https
+    static_configs:
+      - targets: ['FRONTEND_HOST_PLACEHOLDER']
+    metrics_path: /
+    scrape_timeout: 10s
+
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
