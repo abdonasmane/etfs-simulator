@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
@@ -15,17 +16,19 @@ import (
 
 // Handler is the main HTTP handler that routes requests.
 type Handler struct {
-	mux          *http.ServeMux
-	indexService *marketdata.IndexService
-	metrics      *metrics.Metrics
+	mux                *http.ServeMux
+	indexService       *marketdata.IndexService
+	metrics            *metrics.Metrics
+	corsAllowedOrigins string
 }
 
 // New creates a new Handler with all routes registered.
-func New(indexService *marketdata.IndexService, m *metrics.Metrics) *Handler {
+func New(indexService *marketdata.IndexService, m *metrics.Metrics, corsAllowedOrigins string) *Handler {
 	h := &Handler{
-		mux:          http.NewServeMux(),
-		indexService: indexService,
-		metrics:      m,
+		mux:                http.NewServeMux(),
+		indexService:       indexService,
+		metrics:            m,
+		corsAllowedOrigins: corsAllowedOrigins,
 	}
 
 	h.registerRoutes()
@@ -35,9 +38,14 @@ func New(indexService *marketdata.IndexService, m *metrics.Metrics) *Handler {
 // ServeHTTP implements the http.Handler interface with CORS support and metrics.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Set CORS headers for all requests
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	origin := r.Header.Get("Origin")
+	allowedOrigin := h.getAllowedOrigin(origin)
+	if allowedOrigin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
 
 	// Handle preflight requests
 	if r.Method == http.MethodOptions {
@@ -47,6 +55,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Apply metrics middleware
 	h.metrics.Middleware(h.mux).ServeHTTP(w, r)
+}
+
+// getAllowedOrigin checks if the request origin is allowed and returns the origin to use.
+func (h *Handler) getAllowedOrigin(origin string) string {
+	// If "*" is configured, allow all origins
+	if h.corsAllowedOrigins == "*" {
+		return "*"
+	}
+
+	// Check if the origin is in the allowed list
+	allowedOrigins := strings.Split(h.corsAllowedOrigins, ",")
+	for _, allowed := range allowedOrigins {
+		allowed = strings.TrimSpace(allowed)
+		if allowed == origin {
+			return origin
+		}
+	}
+
+	return ""
 }
 
 // registerRoutes sets up all API routes.

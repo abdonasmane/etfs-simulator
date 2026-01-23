@@ -22,15 +22,16 @@ COPY --from=builder /app/dist/frontend/browser /usr/share/nginx/html
 # Copy nginx config for SPA routing
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# nginx:alpine runs as nginx user by default, ensure proper permissions
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    touch /var/run/nginx.pid && \
-    chown -R nginx:nginx /var/run/nginx.pid
+# Move config.json to template for envsubst
+RUN mv /usr/share/nginx/html/assets/config.json /usr/share/nginx/html/assets/config.json.template
 
-# Use non-root user for security
-USER nginx
+# Create entrypoint script for runtime config injection
+# This runs before nginx starts and substitutes env vars into config.json
+RUN printf '#!/bin/sh\nenvsubst < /usr/share/nginx/html/assets/config.json.template > /usr/share/nginx/html/assets/config.json\n' > /docker-entrypoint.d/40-envsubst-config.sh && \
+    chmod +x /docker-entrypoint.d/40-envsubst-config.sh
+
+# Default API URL (can be overridden via environment variable)
+ENV API_URL=http://localhost:8080
 
 # Expose port
 EXPOSE 80

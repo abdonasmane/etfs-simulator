@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 
-import { environment } from '../../../environments/environment';
+import { ConfigService } from './config.service';
 import {
   HealthResponse,
   SimulateByYearsRequest,
@@ -23,7 +23,11 @@ import {
 })
 export class ApiService {
   private readonly http = inject(HttpClient);
-  private readonly baseUrl = environment.apiUrl;
+  private readonly configService = inject(ConfigService);
+
+  private get baseUrl(): string {
+    return this.configService.apiUrl;
+  }
 
   /**
    * Check API health status.

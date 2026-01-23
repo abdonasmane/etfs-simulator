@@ -19,6 +19,10 @@ type Config struct {
 
 	// Env specifies the runtime environment (development, staging, production).
 	Env string
+
+	// CORSAllowedOrigins is a comma-separated list of allowed origins for CORS.
+	// Use "*" to allow all origins (default for development).
+	CORSAllowedOrigins string
 }
 
 // ServerConfig holds HTTP server specific configuration.
@@ -51,7 +55,8 @@ func (s ServerConfig) Addr() string {
 // It applies sensible defaults for any unset variables.
 func Load() (*Config, error) {
 	cfg := &Config{
-		Env: getEnv("APP_ENV", "development"),
+		Env:                getEnv("APP_ENV", "development"),
+		CORSAllowedOrigins: getEnv("CORS_ALLOWED_ORIGINS", "*"),
 		Server: ServerConfig{
 			Host:            getEnv("SERVER_HOST", "0.0.0.0"),
 			Port:            getEnvAsInt("SERVER_PORT", 8080),

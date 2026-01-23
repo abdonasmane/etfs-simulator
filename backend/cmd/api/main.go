@@ -66,7 +66,7 @@ func run() error {
 	m := metrics.New()
 
 	// Create HTTP handler
-	h := handler.New(indexService, m)
+	h := handler.New(indexService, m, cfg.CORSAllowedOrigins)
 
 	// Create and start server
 	srv := server.New(server.Options{
