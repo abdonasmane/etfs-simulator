@@ -31,10 +31,22 @@ type SupportedIndex struct {
 }
 
 // DefaultSupportedIndexes are the indexes we support out of the box.
+// Non-US ETFs use Yahoo Finance exchange suffixes (e.g. .L for LSE, .DE for XETRA).
 var DefaultSupportedIndexes = []SupportedIndex{
+	// US-listed
 	{Symbol: "SPY", Name: "S&P 500", Description: "500 largest US companies"},
 	{Symbol: "QQQ", Name: "NASDAQ 100", Description: "100 largest non-financial NASDAQ companies"},
 	{Symbol: "EFA", Name: "MSCI EAFE", Description: "Developed markets excluding US & Canada"},
+	{Symbol: "VTI", Name: "US Total Market", Description: "Entire US stock market (Vanguard)"},
+	{Symbol: "IEMG", Name: "Emerging Markets", Description: "Core MSCI Emerging Markets (iShares)"},
+	{Symbol: "GLD", Name: "Gold", Description: "Physical gold bullion (SPDR)"},
+	{Symbol: "TLT", Name: "US Bonds 20yr+", Description: "20+ year US Treasury bonds (iShares)"},
+	// Europe-listed UCITS
+	{Symbol: "CSPX.L", Name: "S&P 500 UCITS", Description: "iShares Core S&P 500 UCITS ETF (LSE)"},
+	{Symbol: "VWCE.DE", Name: "FTSE All-World UCITS", Description: "Vanguard FTSE All-World UCITS ETF (XETRA)"},
+	// Shariah-compliant
+	{Symbol: "ISDU.L", Name: "MSCI USA Islamic", Description: "iShares MSCI USA Islamic UCITS ETF (Shariah)"},
+	{Symbol: "IGDA.L", Name: "Global Developed Islamic", Description: "Invesco Dow Jones Islamic Global Developed Markets UCITS ETF (Shariah)"},
 }
 
 // IndexService provides cached access to index statistics.

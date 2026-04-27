@@ -83,11 +83,19 @@ export class SimulationResultsComponent {
     return this.summary.contributionMilestones && this.summary.contributionMilestones.length > 0;
   }
 
-  /** ETF color map for portfolio visualization */
+  /** ETF color map for portfolio visualization — must mirror AVAILABLE_ETFS colors */
   private readonly etfColors: Record<string, string> = {
-    SPY: '#4361ee',
-    QQQ: '#7c3aed',
-    EFA: '#0891b2',
+    SPY:     '#4361ee',
+    QQQ:     '#7c3aed',
+    EFA:     '#0891b2',
+    VTI:     '#059669',
+    IEMG:    '#dc2626',
+    'VWCE.DE': '#6366f1',
+    'CSPX.L':  '#2563eb',
+    GLD:     '#d97706',
+    TLT:     '#64748b',
+    'ISDU.L':  '#0d9488',
+    'IGDA.L':  '#b45309',
   };
 
   /**

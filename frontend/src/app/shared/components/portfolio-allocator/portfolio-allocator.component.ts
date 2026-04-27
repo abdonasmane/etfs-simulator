@@ -24,9 +24,14 @@ export interface AllocationOutput {
  * Available ETFs for portfolio allocation.
  */
 export const AVAILABLE_ETFS: PortfolioETF[] = [
-  { symbol: 'SPY', name: 'S&P 500', hint: '~8.7% median', color: '#4361ee' },
-  { symbol: 'QQQ', name: 'NASDAQ 100', hint: '~13.6% median', color: '#7c3aed' },
-  { symbol: 'EFA', name: 'MSCI EAFE', hint: '~5.7% median', color: '#0891b2' },
+  { symbol: 'SPY',     name: 'S&P 500',           hint: '~8.7% median',  color: '#4361ee' },
+  { symbol: 'QQQ',     name: 'NASDAQ 100',         hint: '~13.6% median', color: '#7c3aed' },
+  { symbol: 'EFA',     name: 'MSCI EAFE',          hint: '~5.7% median',  color: '#0891b2' },
+  { symbol: 'VTI',     name: 'US Total Market',    hint: 'Vanguard',      color: '#059669' },
+  { symbol: 'IEMG',    name: 'Emerging Markets',   hint: 'iShares',       color: '#dc2626' },
+  { symbol: 'VWCE.DE', name: 'FTSE All-World',     hint: 'UCITS',         color: '#6366f1' },
+  { symbol: 'ISDU.L',  name: 'MSCI USA Islamic',   hint: 'Shariah',       color: '#0d9488' },
+  { symbol: 'IGDA.L',  name: 'Global Dev. Islamic',hint: 'Shariah',       color: '#b45309' },
 ];
 
 /**
@@ -321,11 +326,11 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
   ],
 })
 export class PortfolioAllocatorComponent implements OnInit {
-  @Input() initialAllocations: number[] = [60, 30, 10];
+  @Input() initialAllocations: number[] = [50, 30, 20, 0, 0, 0, 0, 0];
   @Output() allocationsChange = new EventEmitter<AllocationOutput[]>();
 
   readonly etfs = AVAILABLE_ETFS;
-  allocations: number[] = [60, 30, 10];
+  allocations: number[] = [50, 30, 20, 0, 0, 0, 0, 0];
 
   ngOnInit(): void {
     if (this.initialAllocations?.length === this.etfs.length) {
@@ -349,15 +354,16 @@ export class PortfolioAllocatorComponent implements OnInit {
   }
 
   applyPreset(preset: 'balanced' | 'aggressive' | 'conservative'): void {
+    // Allocations match AVAILABLE_ETFS order: SPY, QQQ, EFA, VTI, IEMG, VWCE.DE, ISDU.L, IGDA.L
     switch (preset) {
       case 'balanced':
-        this.allocations = [50, 30, 20];
+        this.allocations = [40, 20, 15, 15, 10, 0, 0, 0];
         break;
       case 'aggressive':
-        this.allocations = [40, 50, 10];
+        this.allocations = [25, 40, 5, 10, 20, 0, 0, 0];
         break;
       case 'conservative':
-        this.allocations = [60, 15, 25];
+        this.allocations = [50, 10, 20, 15, 5, 0, 0, 0];
         break;
     }
     this.emitAllocations();

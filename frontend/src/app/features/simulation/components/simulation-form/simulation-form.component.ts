@@ -67,9 +67,21 @@ export class SimulationFormComponent {
 
   /** Options for expected annual return based on historical index performance */
   returnOptions: IndexOption[] = [
-    { label: 'S&P 500', value: 1, hint: '~8.7% median (20yr rolling)', symbol: 'SPY' },
-    { label: 'NASDAQ 100', value: 2, hint: '~13.6% median (20yr rolling)', symbol: 'QQQ' },
-    { label: 'MSCI EAFE', value: 3, hint: '~5.7% median (20yr rolling)', symbol: 'EFA' },
+    // US-listed
+    { label: 'S&P 500 (SPY)', value: 1, hint: '~8.7% median (20yr rolling)', symbol: 'SPY' },
+    { label: 'NASDAQ 100 (QQQ)', value: 2, hint: '~13.6% median (20yr rolling)', symbol: 'QQQ' },
+    { label: 'MSCI EAFE (EFA)', value: 3, hint: '~5.7% median (20yr rolling)', symbol: 'EFA' },
+    { label: 'US Total Market (VTI)', value: 4, symbol: 'VTI' },
+    { label: 'Emerging Markets (IEMG)', value: 5, symbol: 'IEMG' },
+    { label: 'Gold (GLD)', value: 6, symbol: 'GLD' },
+    { label: 'US Bonds 20yr+ (TLT)', value: 7, symbol: 'TLT' },
+    // Europe-listed UCITS
+    { label: 'S&P 500 UCITS (CSPX.L)', value: 8, symbol: 'CSPX.L' },
+    { label: 'FTSE All-World UCITS (VWCE.DE)', value: 9, symbol: 'VWCE.DE' },
+    // Shariah
+    { label: 'MSCI USA Islamic (ISDU.L)', value: 10, symbol: 'ISDU.L' },
+    { label: 'Global Developed Islamic (IGDA.L)', value: 11, symbol: 'IGDA.L' },
+    // Other
     { label: 'Custom Portfolio', value: -2, hint: 'Mix multiple ETFs' },
     { label: 'Custom rate...', value: -1 },
   ];
@@ -107,9 +119,9 @@ export class SimulationFormComponent {
 
   /** Current portfolio allocations (for custom portfolio mode) */
   portfolioAllocations: AllocationOutput[] = [
-    { symbol: 'SPY', weight: 60 },
+    { symbol: 'SPY', weight: 50 },
     { symbol: 'QQQ', weight: 30 },
-    { symbol: 'EFA', weight: 10 },
+    { symbol: 'EFA', weight: 20 },
   ];
 
   private readonly fb = inject(FormBuilder);
