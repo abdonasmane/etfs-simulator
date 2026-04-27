@@ -95,6 +95,7 @@ func (h *Handler) registerRoutes() {
 	// Simulation endpoints
 	h.mux.HandleFunc("POST /api/v1/simulate/years", h.handleSimulateByYears)
 	h.mux.HandleFunc("POST /api/v1/simulate/target", h.handleSimulateByTarget)
+	h.mux.HandleFunc("POST /api/v1/simulate/historical", h.handleSimulateHistorical)
 }
 
 // ErrorResponse is the standard error response.

@@ -45,7 +45,7 @@ export class SimulationPageComponent {
   readonly resultKey = signal(0);
 
   /**
-   * Handle form submission and call API.
+   * Handle form submission and call the appropriate API based on mode.
    */
   onSimulate(data: SimulationFormData): void {
     this.loading.set(true);
@@ -86,6 +86,43 @@ export class SimulationPageComponent {
         .subscribe({
           next: response => {
             this.updateResults(response.summary, response.projections);
+          },
+          error: err => {
+            this.error.set(err.message);
+            this.loading.set(false);
+          },
+        });
+    } else if (data.mode === 'whatif' && data.startYear && data.startMonth) {
+      this.apiService
+        .simulateHistorical({
+          initialInvestment: data.initialInvestment,
+          monthlyContribution: data.monthlyContribution,
+          startYear: data.startYear,
+          startMonth: data.startMonth,
+          portfolio: data.portfolio,
+          indexSymbol: data.indexSymbol,
+          contributionGrowthRate: data.contributionGrowthRate,
+        })
+        .subscribe({
+          next: response => {
+            // Map HistoricalSimulateSummary → SimulateSummary shape
+            const historicalSummary: SimulateSummary = {
+              targetDate: response.summary.endDate,
+              finalValue: response.summary.finalValue,
+              totalContributed: response.summary.totalContributed,
+              totalGain: response.summary.totalGain,
+              percentageGain: response.summary.percentageGain,
+              totalMonths: response.summary.totalMonths,
+              finalMonthlyContribution: response.summary.finalMonthlyContribution,
+              contributionMilestones: response.summary.contributionMilestones,
+              hasRange: false,
+              portfolio: response.summary.portfolio,
+              // Historical-specific fields
+              isHistorical: true,
+              historicalStartDate: response.summary.startDate,
+              annualizedReturn: response.summary.annualizedReturn,
+            };
+            this.updateResults(historicalSummary, response.projections);
           },
           error: err => {
             this.error.set(err.message);

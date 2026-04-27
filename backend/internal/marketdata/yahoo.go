@@ -111,7 +111,19 @@ type IndexStats struct {
 // FetchHistoricalData fetches historical monthly data for a symbol.
 func (c *YahooClient) FetchHistoricalData(symbol, interval, rangePeriod string) (*HistoricalData, error) {
 	url := fmt.Sprintf("%s/%s?interval=%s&range=%s", c.baseURL, symbol, interval, rangePeriod)
+	return c.fetchFromURL(symbol, interval, url)
+}
 
+// FetchHistoricalDataByPeriod fetches historical monthly data for a symbol between two specific dates.
+// This is used for "what if" historical simulations using real past price data.
+func (c *YahooClient) FetchHistoricalDataByPeriod(symbol string, startTime, endTime time.Time) (*HistoricalData, error) {
+	url := fmt.Sprintf("%s/%s?interval=1mo&period1=%d&period2=%d",
+		c.baseURL, symbol, startTime.Unix(), endTime.Unix())
+	return c.fetchFromURL(symbol, "1mo", url)
+}
+
+// fetchFromURL performs the actual HTTP fetch and parses the Yahoo Finance response.
+func (c *YahooClient) fetchFromURL(symbol, interval, url string) (*HistoricalData, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if errors.Check(err) {
 		return nil, errors.Wrap(err, "creating request")

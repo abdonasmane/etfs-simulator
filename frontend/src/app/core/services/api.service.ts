@@ -10,6 +10,8 @@ import {
   SimulateByYearsResponse,
   SimulateByTargetRequest,
   SimulateByTargetResponse,
+  SimulateHistoricalRequest,
+  SimulateHistoricalResponse,
   ApiError,
 } from '../models';
 
@@ -60,6 +62,19 @@ export class ApiService {
   simulateByTarget(request: SimulateByTargetRequest): Observable<SimulateByTargetResponse> {
     return this.http
       .post<SimulateByTargetResponse>(`${this.baseUrl}/api/v1/simulate/target`, request)
+      .pipe(catchError(this.handleError));
+  }
+
+  /**
+   * Run a "what if" simulation using real historical price data.
+   * POST /api/v1/simulate/historical
+   *
+   * @param request - Simulation parameters including start date and ETF selection
+   * @returns Observable with actual historical projections and summary
+   */
+  simulateHistorical(request: SimulateHistoricalRequest): Observable<SimulateHistoricalResponse> {
+    return this.http
+      .post<SimulateHistoricalResponse>(`${this.baseUrl}/api/v1/simulate/historical`, request)
       .pipe(catchError(this.handleError));
   }
 

@@ -148,6 +148,12 @@ func (s *IndexService) GetAllIndexes() []*IndexInfo {
 	return result
 }
 
+// FetchHistoricalPrices fetches actual monthly price data for a symbol over a specific date range.
+// This is used for "what if" simulations with real historical data instead of statistical projections.
+func (s *IndexService) FetchHistoricalPrices(symbol string, startTime, endTime time.Time) (*HistoricalData, error) {
+	return s.client.FetchHistoricalDataByPeriod(symbol, startTime, endTime)
+}
+
 // RefreshIfNeeded refreshes the cache if TTL has expired.
 func (s *IndexService) RefreshIfNeeded() {
 	if time.Since(s.lastUpdate) < s.cacheTTL {

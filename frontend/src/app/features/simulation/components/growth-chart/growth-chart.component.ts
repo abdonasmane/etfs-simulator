@@ -49,6 +49,9 @@ Chart.register(...registerables);
 export class GrowthChartComponent implements AfterViewInit, OnChanges {
   @Input({ required: true }) projections!: MonthProjection[];
 
+  /** When true, renders chart in historical amber/gold color scheme */
+  @Input() isHistorical = false;
+
   @ViewChild('chartCanvas') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
   private readonly themeService = inject(ThemeService);
@@ -72,7 +75,7 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['projections'] && this.chart) {
+    if ((changes['projections'] || changes['isHistorical']) && this.chart) {
       this.updateChart();
     }
   }
@@ -268,9 +271,9 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       });
     }
 
-    // Main portfolio value line (median)
+    // Main portfolio value line (median / actual)
     datasets.push({
-      label: this.hasRangeData ? 'Expected (Median)' : 'Portfolio Value',
+      label: this.isHistorical ? 'Actual Portfolio Value' : (this.hasRangeData ? 'Expected (Median)' : 'Portfolio Value'),
       data: data.portfolioValues,
       borderColor: colors.accent,
       backgroundColor: this.hasRangeData ? 'transparent' : this.createGradient(ctx, colors.accent, 0.3),

@@ -1,4 +1,4 @@
-<div class="simulation-form">
+<div class="simulation-form" [class.mode-historical]="mode === 'whatif'">
   <h2>Investment Simulator</h2>
 
   <!-- Mode Toggle -->
@@ -17,9 +17,66 @@
     >
       By Target Date
     </button>
+    <button
+      type="button"
+      [class.active]="mode === 'whatif'"
+      (click)="setMode('whatif')"
+    >
+      What If?
+    </button>
   </div>
 
+  <!-- Historical Mode Banner -->
+  @if (mode === 'whatif') {
+    <div class="historical-banner fade-in">
+      <div class="historical-banner-text">
+        <strong>Real Historical Data</strong>
+        <span>Replays actual market returns</span>
+      </div>
+    </div>
+  }
+
   <form [formGroup]="form" (ngSubmit)="onSubmit()">
+
+    <!-- Historical Start Date (only in What If mode) -->
+    @if (mode === 'whatif') {
+      <div class="form-group fade-in">
+        <span class="field-label">
+          If you had started investing in...
+          <app-tooltip
+            text="Pick the month and year you would have made your first investment. We'll replay real market returns from that date to today."
+            position="left"
+          />
+        </span>
+        <div class="date-row">
+          <div class="date-col">
+            <app-custom-select
+              [options]="monthOptions"
+              [value]="selectedHistoricalMonth"
+              (valueChange)="selectedHistoricalMonth = $event"
+            />
+          </div>
+          <div class="date-col">
+            <app-custom-select
+              [options]="historicalYearOptions"
+              [value]="selectedHistoricalYear"
+              (valueChange)="selectedHistoricalYear = $event"
+            />
+          </div>
+        </div>
+        @if (isHistoricalDateValid) {
+          <div class="period-chip fade-in">
+            <span class="period-dot"></span>
+            {{ historicalPeriodDescription }}
+          </div>
+        } @else {
+          <div class="helper-text helper-text--error">
+            Start date must be at least 1 month in the past
+          </div>
+        }
+      </div>
+    }
+
     <!-- Initial Investment -->
     <div class="form-group">
       <label for="initialInvestment">
@@ -82,37 +139,65 @@
       }
     </div>
 
-    <!-- Expected Annual Return -->
-    <div class="form-group">
-      <span class="field-label">
-        Expected Annual Return
-        <app-tooltip text="Based on historical index performance. Past returns don't guarantee future results, but provide a reasonable estimate." position="left" />
-      </span>
-      <app-custom-select
-        [options]="returnOptions"
-        [value]="selectedReturnOption"
-        (valueChange)="onReturnOptionChange($event)"
-      />
-      @if (isCustomReturn) {
-        <div class="input-with-suffix fade-in" style="margin-top: 0.5rem;">
-          <input
-            id="annualReturnRate"
-            type="number"
-            formControlName="annualReturnRate"
-            min="0"
-            max="100"
-            step="0.5"
-          />
-          <span class="suffix">%</span>
-        </div>
-      }
-      @if (isCustomPortfolio) {
-        <app-portfolio-allocator
-          class="fade-in"
-          (allocationsChange)="onPortfolioChange($event)"
+    <!-- Expected Annual Return (hidden in whatif mode — we use real data) -->
+    @if (mode !== 'whatif') {
+      <div class="form-group fade-in">
+        <span class="field-label">
+          Expected Annual Return
+          <app-tooltip text="Based on historical index performance. Past returns don't guarantee future results, but provide a reasonable estimate." position="left" />
+        </span>
+        <app-custom-select
+          [options]="returnOptions"
+          [value]="selectedReturnOption"
+          (valueChange)="onReturnOptionChange($event)"
         />
-      }
-    </div>
+        @if (isCustomReturn) {
+          <div class="input-with-suffix fade-in" style="margin-top: 0.5rem;">
+            <input
+              id="annualReturnRate"
+              type="number"
+              formControlName="annualReturnRate"
+              min="0"
+              max="100"
+              step="0.5"
+            />
+            <span class="suffix">%</span>
+          </div>
+        }
+        @if (isCustomPortfolio) {
+          <app-portfolio-allocator
+            class="fade-in"
+            (allocationsChange)="onPortfolioChange($event)"
+          />
+        }
+      </div>
+    }
+
+    <!-- ETF selection shown in whatif mode -->
+    @if (mode === 'whatif') {
+      <div class="form-group fade-in">
+        <span class="field-label">
+          ETF / Index
+          <app-tooltip text="Which ETF would you have invested in? We'll use its actual adjusted price history to calculate your real returns." position="left" />
+        </span>
+        <app-custom-select
+          [options]="returnOptions"
+          [value]="selectedReturnOption"
+          (valueChange)="onReturnOptionChange($event)"
+        />
+        @if (isCustomPortfolio) {
+          <app-portfolio-allocator
+            class="fade-in"
+            (allocationsChange)="onPortfolioChange($event)"
+          />
+        }
+        @if (isCustomReturn) {
+          <div class="helper-text" style="margin-top: 0.5rem;">
+            Custom rate not supported in What If mode — a real ETF is required.
+          </div>
+        }
+      </div>
+    }
 
     <!-- Mode-specific fields container -->
     <div class="mode-fields">
@@ -141,7 +226,7 @@
         </div>
       }
 
-      <!-- Target Date Mode - Slider + Month -->
+      <!-- Target Date Mode -->
       @if (mode === 'target') {
         <div class="form-group fade-in">
           <label for="targetYearsFromNow">
@@ -174,10 +259,28 @@
           />
         </div>
       }
+
+      <!-- What If mode has no additional time fields (always "to today") -->
+      @if (mode === 'whatif') {
+        <div class="whatif-to-today fade-in">
+          <span>Results calculated through <strong>today</strong></span>
+        </div>
+      }
     </div>
 
-    <button type="submit" class="submit-btn" [disabled]="form.invalid || (isCustomPortfolio && !isPortfolioValid)">
-      Calculate
+    <button
+      type="submit"
+      class="submit-btn"
+      [disabled]="form.invalid
+        || (isCustomPortfolio && !isPortfolioValid)
+        || (mode === 'whatif' && !isHistoricalDateValid)
+        || (mode === 'whatif' && isCustomReturn)"
+    >
+      @if (mode === 'whatif') {
+        Replay History
+      } @else {
+        Calculate
+      }
     </button>
   </form>
 </div>

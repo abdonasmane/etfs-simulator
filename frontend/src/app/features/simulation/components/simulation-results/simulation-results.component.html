@@ -1,16 +1,27 @@
 <div class="simulation-results">
   <!-- Hero Result -->
   <div class="hero-result">
-    <div class="hero-label">
-      @if (summary.hasRange) {
-        Expected Portfolio Value by {{ summary.targetDate }}
-      } @else {
-        Projected Portfolio Value by {{ summary.targetDate }}
-      }
-    </div>
+
+    @if (summary.isHistorical) {
+      <div class="hero-label">
+        <span class="hero-historical-badge">Real Historical Data</span>
+      </div>
+      <div class="hero-sublabel">
+        Your portfolio today · invested since {{ summary.historicalStartDate }}
+      </div>
+    } @else {
+      <div class="hero-label">
+        @if (summary.hasRange) {
+          Expected Portfolio Value by {{ summary.targetDate }}
+        } @else {
+          Projected Portfolio Value by {{ summary.targetDate }}
+        }
+      </div>
+    }
+
     <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
-    
-    @if (summary.hasRange && summary.pessimisticValue && summary.optimisticValue) {
+
+    @if (!summary.isHistorical && summary.hasRange && summary.pessimisticValue && summary.optimisticValue) {
       <div class="hero-range">
         <span class="range-label">Historical range:</span>
         <span class="range-values">
@@ -20,17 +31,24 @@
         </span>
       </div>
     }
-    
+
     <div class="hero-gain">
       <span class="gain-badge">
         +{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
         <span class="gain-percent">(+{{ summary.percentageGain | number: '1.1-1' }}%)</span>
       </span>
     </div>
-    
-    @if (!summary.hasRange) {
+
+    @if (summary.isHistorical && summary.annualizedReturn !== undefined) {
+      <div class="hero-annualized">
+        ~{{ summary.annualizedReturn | number: '1.1-1' }}% avg. annual return
+        over {{ (summary.totalMonths / 12) | number: '1.0-0' }} years
+      </div>
+    }
+
+    @if (!summary.isHistorical && !summary.hasRange) {
       <div class="custom-rate-notice">
-        ⚠️ Using custom rate — no historical range available
+        Using custom rate — no historical range available
       </div>
     }
   </div>
@@ -68,12 +86,11 @@
   }
 
   <!-- Chart -->
-  <app-growth-chart [projections]="projections" />
+  <app-growth-chart [projections]="projections" [isHistorical]="summary.isHistorical ?? false" />
 
   <!-- Summary Stats -->
   <div class="stats-grid">
     <div class="stat-card">
-      <div class="stat-icon">💰</div>
       <div class="stat-content">
         <div class="stat-value">{{ summary.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
         <div class="stat-label">Total Contributed</div>
@@ -81,7 +98,6 @@
     </div>
 
     <div class="stat-card">
-      <div class="stat-icon">📈</div>
       <div class="stat-content">
         <div class="stat-value positive">{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
         @if (summary.hasRange && summary.pessimisticGain && summary.optimisticGain) {
@@ -95,7 +111,6 @@
     </div>
 
     <div class="stat-card">
-      <div class="stat-icon">📅</div>
       <div class="stat-content">
         <div class="stat-value">{{ (summary.totalMonths / 12) | number: '1.1-1' }} years</div>
         <div class="stat-label">Investment Period</div>
@@ -103,7 +118,6 @@
     </div>
 
     <div class="stat-card">
-      <div class="stat-icon">⚡</div>
       <div class="stat-content">
         <div class="stat-value positive">+{{ summary.percentageGain | number: '1.1-1' }}%</div>
         @if (summary.hasRange && summary.pessimisticPercent !== undefined && summary.optimisticPercent !== undefined) {
@@ -120,18 +134,15 @@
   @if (hasContributionGrowth) {
     <div class="milestones-section">
       <div 
-      class="milestones-header" 
-      (click)="toggleMilestones()"
-      (keydown.enter)="toggleMilestones()"
-      (keydown.space)="toggleMilestones()"
-      tabindex="0"
-      role="button"
-      [attr.aria-expanded]="showMilestones"
-    >
-        <h3>
-          <span class="milestone-icon">📊</span>
-          Contribution Growth
-        </h3>
+        class="milestones-header" 
+        (click)="toggleMilestones()"
+        (keydown.enter)="toggleMilestones()"
+        (keydown.space)="toggleMilestones()"
+        tabindex="0"
+        role="button"
+        [attr.aria-expanded]="showMilestones"
+      >
+        <h3>Contribution Growth</h3>
         <span class="milestone-summary">
           €{{ summary.contributionMilestones[0]?.monthlyContribution | number: '1.0-0' }}/mo 
           → 

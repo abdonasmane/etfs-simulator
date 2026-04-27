@@ -188,6 +188,17 @@ export interface SimulateSummary {
 
   /** Blended median return for portfolio */
   blendedMedianReturn?: number;
+
+  // --- Historical simulation fields (only present when isHistorical is true) ---
+
+  /** True when this summary represents a historical "what if" simulation */
+  isHistorical?: boolean;
+
+  /** Human-readable start date of the historical period (e.g., "January 2010") */
+  historicalStartDate?: string;
+
+  /** Approximate annualized return over the historical period */
+  annualizedReturn?: number;
 }
 
 /**
@@ -206,6 +217,61 @@ export interface SimulateByTargetResponse {
   inputs: SimulateByTargetRequest;
   projections: MonthProjection[];
   summary: SimulateSummary;
+}
+
+// --- Historical Simulation Types ---
+
+/**
+ * Request for a "what if" historical simulation.
+ * POST /api/v1/simulate/historical
+ */
+export interface SimulateHistoricalRequest {
+  /** Starting investment amount */
+  initialInvestment: number;
+
+  /** Starting monthly contribution amount */
+  monthlyContribution: number;
+
+  /** Year when the hypothetical investment started (>= 1993) */
+  startYear: number;
+
+  /** Month when the hypothetical investment started (1-12) */
+  startMonth: number;
+
+  /** Portfolio allocations. Takes precedence over indexSymbol. */
+  portfolio?: PortfolioAllocation[];
+
+  /** Index symbol (e.g., "SPY"). Used when portfolio is not provided. */
+  indexSymbol?: string;
+
+  /** Annual percentage increase in contributions (default: 0) */
+  contributionGrowthRate?: number;
+}
+
+/**
+ * Summary of a historical simulation — real data, no ranges.
+ */
+export interface HistoricalSimulateSummary {
+  startDate: string;
+  endDate: string;
+  finalValue: number;
+  totalContributed: number;
+  totalGain: number;
+  percentageGain: number;
+  totalMonths: number;
+  annualizedReturn: number;
+  finalMonthlyContribution: number;
+  contributionMilestones: ContributionMilestone[];
+  portfolio?: PortfolioBreakdown[];
+}
+
+/**
+ * Response for a historical simulation.
+ */
+export interface SimulateHistoricalResponse {
+  inputs: SimulateHistoricalRequest;
+  projections: MonthProjection[];
+  summary: HistoricalSimulateSummary;
 }
 
 // --- Error Response ---
