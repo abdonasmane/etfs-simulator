@@ -122,9 +122,19 @@ func (h *Handler) handleSimulateHistorical(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Fetch actual historical prices for all symbols
-	// We fetch from one month before startDate to get the baseline price
-	fetchStart := startDate.AddDate(0, -1, 0)
+	// Reject start dates that predate any selected ETF's first data point.
+	// Without this check, the simulation would silently clip to the latest
+	// common start month and report a shorter duration than the user asked for.
+	if err := h.validateSymbolCoverage(symbols, startDate); errors.Check(err) {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Fetch actual historical prices for all symbols. We pull a 12-month
+	// buffer before startDate so the baseline lookup can walk back through
+	// any Yahoo gaps (Yahoo's monthly bars for some LSE-listed ETFs — e.g.
+	// ISDU.L — are missing every October).
+	fetchStart := startDate.AddDate(-1, 0, 0)
 	pricesBySymbol := make(map[string]map[string]float64)
 
 	for _, symbol := range symbols {
@@ -226,10 +236,46 @@ func (h *Handler) resolveHistoricalAllocations(req SimulateHistoricalRequest) (
 	return nil, nil, nil, errors.New("either indexSymbol or portfolio must be provided")
 }
 
+// validateSymbolCoverage rejects start dates that predate any selected ETF's
+// first available data point. Without this check, the simulation would silently
+// clip to the latest common start month, producing a "duration" mismatch
+// between the requested span and the months actually replayed.
+//
+// Symbols missing from the cache (e.g. failed startup fetch or unknown ticker)
+// are skipped so the live Yahoo fetch downstream can surface its own error.
+func (h *Handler) validateSymbolCoverage(symbols []string, startDate time.Time) error {
+	for _, symbol := range symbols {
+		info, ok := h.indexService.GetIndex(symbol)
+		if !ok {
+			continue
+		}
+		earliest := time.Date(info.DataStartYear, time.Month(info.DataStartMonth), 1, 0, 0, 0, 0, time.UTC)
+		if startDate.Before(earliest) {
+			return errors.Errorf(
+				"%s only has data from %s — please pick a start date on or after that",
+				symbol, info.DataStartDate,
+			)
+		}
+	}
+	return nil
+}
+
 // --- Core Simulation Logic ---
 
-// runHistoricalSimulation replays actual monthly price returns from startDate to endDate.
-// Each month's return is derived from real adjusted-close prices fetched from Yahoo Finance.
+// runHistoricalSimulation replays actual monthly price returns from startDate
+// to endDate. Each month's return is derived from real adjusted-close prices
+// fetched from Yahoo Finance.
+//
+// Yahoo Finance's monthly bars are not perfectly contiguous — some LSE-listed
+// ETFs (e.g. ISDU.L) are systematically missing one month per year, and
+// occasional gaps exist for other ETFs too. To keep the simulation duration
+// faithful to what the user asked for, we carry the last known price forward
+// when a month is missing. The next real bar then captures the cumulative
+// return across the gap in one step, which is mathematically equivalent to
+// computing each missing month's contribution at the spot rate. The result:
+//   - every calendar month from startDate to endDate gets a projection,
+//   - cumulative returns match what the underlying prices say,
+//   - the user sees the duration they asked for, not a silently-clipped one.
 func runHistoricalSimulation(
 	initial, monthlyBase float64,
 	startDate, endDate time.Time,
@@ -240,29 +286,44 @@ func runHistoricalSimulation(
 ) ([]MonthProjection, HistoricalSimulateSummary, error) {
 	monthlyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/12.0) - 1
 
+	// Establish a baseline price for every symbol from the months immediately
+	// preceding startDate. Walks back up to 12 months to absorb a leading
+	// Yahoo gap (we already fetched a 12-month buffer in the handler).
+	lastKnownPrice := make(map[string]float64, len(symbols))
+	for _, symbol := range symbols {
+		baseline, ok := findBaselinePrice(pricesBySymbol[symbol], startDate)
+		if !ok {
+			return nil, HistoricalSimulateSummary{}, errors.Errorf(
+				"no baseline price available for %s near %s", symbol, startDate.Format("January 2006"))
+		}
+		lastKnownPrice[symbol] = baseline
+	}
+
 	balance := initial
 	totalContributed := initial
 	currentContribution := monthlyBase
 	projections := make([]MonthProjection, 0)
 
-	// Walk month by month: prevDate is the baseline, curDate is the month we're projecting
-	prevDate := startDate.AddDate(0, -1, 0)
-	curDate := startDate
-
-	for !curDate.After(endDate) {
-		prevKey := prevDate.Format("2006-01")
+	for curDate := startDate; !curDate.After(endDate); curDate = curDate.AddDate(0, 1, 0) {
 		curKey := curDate.Format("2006-01")
 
-		// Compute blended return across all symbols for this month
-		blendedReturn, dataOK := computeBlendedReturn(symbols, weights, pricesBySymbol, prevKey, curKey)
-		if !dataOK {
-			// Missing data for this month — advance without recording
-			prevDate = curDate
-			curDate = curDate.AddDate(0, 1, 0)
-			continue
+		var blendedReturn float64
+		for i, symbol := range symbols {
+			prevPrice := lastKnownPrice[symbol]
+			curPrice, hasCur := pricesBySymbol[symbol][curKey]
+			if !hasCur || curPrice <= 0 {
+				// Yahoo gap — carry the last known price forward. This symbol
+				// contributes 0% to the blend this month; the move will be
+				// captured at the next available bar.
+				curPrice = prevPrice
+			} else {
+				lastKnownPrice[symbol] = curPrice
+			}
+			if prevPrice > 0 {
+				blendedReturn += weights[i] * (curPrice/prevPrice - 1)
+			}
 		}
 
-		// Apply market return then add monthly contribution
 		balance = balance*(1+blendedReturn) + currentContribution
 		totalContributed += currentContribution
 
@@ -275,9 +336,6 @@ func runHistoricalSimulation(
 		})
 
 		currentContribution *= (1 + monthlyContributionGrowth)
-
-		prevDate = curDate
-		curDate = curDate.AddDate(0, 1, 0)
 	}
 
 	if len(projections) == 0 {
@@ -290,30 +348,27 @@ func runHistoricalSimulation(
 	return projections, summary, nil
 }
 
-// computeBlendedReturn calculates the weighted average return for a given month.
-func computeBlendedReturn(
-	symbols []string,
-	weights []float64,
-	pricesBySymbol map[string]map[string]float64,
-	prevKey, curKey string,
-) (float64, bool) {
-	var blended float64
-	for i, symbol := range symbols {
-		prices := pricesBySymbol[symbol]
-		prevPrice, hasPrev := prices[prevKey]
-		curPrice, hasCur := prices[curKey]
-
-		if !hasPrev || !hasCur || prevPrice <= 0 || curPrice <= 0 {
-			return 0, false
+// findBaselinePrice returns the most recent available adjusted close at or
+// before startDate-1mo, scanning back up to 12 months to absorb leading Yahoo
+// gaps. If even that fails it falls back to startDate's own bar (which yields
+// a 0% return on the first month — appropriate when the user's start date
+// coincides with the ETF's very first data point).
+func findBaselinePrice(prices map[string]float64, startDate time.Time) (float64, bool) {
+	candidate := startDate.AddDate(0, -1, 0)
+	for i := 0; i < 12; i++ {
+		if p, ok := prices[candidate.Format("2006-01")]; ok && p > 0 {
+			return p, true
 		}
-
-		blended += weights[i] * (curPrice/prevPrice - 1)
+		candidate = candidate.AddDate(0, -1, 0)
 	}
-	return blended, true
+	if p, ok := prices[startDate.Format("2006-01")]; ok && p > 0 {
+		return p, true
+	}
+	return 0, false
 }
 
 // buildHistoricalSummary constructs the summary from completed projections.
-func buildHistoricalSummary(projections []MonthProjection, startDate, endDate time.Time) HistoricalSimulateSummary {
+func buildHistoricalSummary(projections []MonthProjection, startDate, _ time.Time) HistoricalSimulateSummary {
 	final := projections[len(projections)-1]
 	totalGain := final.PortfolioValue - final.TotalContributed
 

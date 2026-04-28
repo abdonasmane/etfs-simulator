@@ -3,25 +3,13 @@
 
   <!-- Mode Toggle -->
   <div class="mode-toggle">
-    <button
-      type="button"
-      [class.active]="mode === 'years'"
-      (click)="setMode('years')"
-    >
+    <button type="button" [class.active]="mode === 'years'" (click)="setMode('years')">
       By Duration
     </button>
-    <button
-      type="button"
-      [class.active]="mode === 'target'"
-      (click)="setMode('target')"
-    >
+    <button type="button" [class.active]="mode === 'target'" (click)="setMode('target')">
       By Target Date
     </button>
-    <button
-      type="button"
-      [class.active]="mode === 'whatif'"
-      (click)="setMode('whatif')"
-    >
+    <button type="button" [class.active]="mode === 'whatif'" (click)="setMode('whatif')">
       What If?
     </button>
   </div>
@@ -37,7 +25,6 @@
   }
 
   <form [formGroup]="form" (ngSubmit)="onSubmit()">
-
     <!-- Historical Start Date (only in What If mode) -->
     @if (mode === 'whatif') {
       <div class="form-group fade-in">
@@ -51,7 +38,7 @@
         <div class="date-row">
           <div class="date-col">
             <app-custom-select
-              [options]="monthOptions"
+              [options]="historicalMonthOptions"
               [value]="selectedHistoricalMonth"
               (valueChange)="selectedHistoricalMonth = $event"
             />
@@ -64,15 +51,18 @@
             />
           </div>
         </div>
-        @if (isHistoricalDateValid) {
+        @if (historicalDateValidationError) {
+          <div class="helper-text helper-text--error">
+            {{ historicalDateValidationError }}
+          </div>
+        } @else {
           <div class="period-chip fade-in">
             <span class="period-dot"></span>
             {{ historicalPeriodDescription }}
           </div>
-        } @else {
-          <div class="helper-text helper-text--error">
-            Start date must be at least 1 month in the past
-          </div>
+          @if (effectiveMinHistoricalLabel) {
+            <div class="helper-text">Data available from {{ effectiveMinHistoricalLabel }}</div>
+          }
         }
       </div>
     }
@@ -81,7 +71,9 @@
     <div class="form-group">
       <label for="initialInvestment">
         Initial Investment
-        <app-tooltip text="The amount you start with. This could be savings you've already accumulated." />
+        <app-tooltip
+          text="The amount you start with. This could be savings you've already accumulated."
+        />
       </label>
       <div class="input-with-prefix">
         <span class="prefix">€</span>
@@ -99,7 +91,9 @@
     <div class="form-group">
       <label for="monthlyContribution">
         Monthly Contribution
-        <app-tooltip text="How much you'll invest each month. Consistency is key to long-term growth." />
+        <app-tooltip
+          text="How much you'll invest each month. Consistency is key to long-term growth."
+        />
       </label>
       <div class="input-with-prefix">
         <span class="prefix">€</span>
@@ -117,7 +111,10 @@
     <div class="form-group">
       <span class="field-label">
         Yearly Contribution Increase
-        <app-tooltip text="Increase your monthly contribution each year to keep up with inflation or salary growth. Even small increases compound significantly over time." position="left" />
+        <app-tooltip
+          text="Increase your monthly contribution each year to keep up with inflation or salary growth. Even small increases compound significantly over time."
+          position="left"
+        />
       </span>
       <app-custom-select
         [options]="growthOptions"
@@ -125,7 +122,7 @@
         (valueChange)="onGrowthOptionChange($event)"
       />
       @if (isCustomGrowth) {
-        <div class="input-with-suffix fade-in" style="margin-top: 0.5rem;">
+        <div class="input-with-suffix fade-in" style="margin-top: 0.5rem">
           <input
             id="contributionGrowthRate"
             type="number"
@@ -144,7 +141,10 @@
       <div class="form-group fade-in">
         <span class="field-label">
           Expected Annual Return
-          <app-tooltip text="Based on historical index performance. Past returns don't guarantee future results, but provide a reasonable estimate." position="left" />
+          <app-tooltip
+            text="Based on historical index performance. Past returns don't guarantee future results, but provide a reasonable estimate."
+            position="left"
+          />
         </span>
         <app-custom-select
           [options]="returnOptions"
@@ -152,7 +152,7 @@
           (valueChange)="onReturnOptionChange($event)"
         />
         @if (isCustomReturn) {
-          <div class="input-with-suffix fade-in" style="margin-top: 0.5rem;">
+          <div class="input-with-suffix fade-in" style="margin-top: 0.5rem">
             <input
               id="annualReturnRate"
               type="number"
@@ -178,7 +178,10 @@
       <div class="form-group fade-in">
         <span class="field-label">
           ETF / Index
-          <app-tooltip text="Which ETF would you have invested in? We'll use its actual adjusted price history to calculate your real returns." position="left" />
+          <app-tooltip
+            text="Which ETF would you have invested in? We'll use its actual adjusted price history to calculate your real returns."
+            position="left"
+          />
         </span>
         <app-custom-select
           [options]="returnOptions"
@@ -192,7 +195,7 @@
           />
         }
         @if (isCustomReturn) {
-          <div class="helper-text" style="margin-top: 0.5rem;">
+          <div class="helper-text" style="margin-top: 0.5rem">
             Custom rate not supported in What If mode — a real ETF is required.
           </div>
         }
@@ -207,18 +210,13 @@
           <label for="years">
             <span class="label-with-tooltip">
               Investment Period
-              <app-tooltip text="The longer you invest, the more time compound interest has to grow your money. Even a few extra years make a big difference." />
+              <app-tooltip
+                text="The longer you invest, the more time compound interest has to grow your money. Even a few extra years make a big difference."
+              />
             </span>
             <span class="slider-value">{{ form.value.years }} years</span>
           </label>
-          <input
-            id="years"
-            type="range"
-            formControlName="years"
-            min="1"
-            max="49"
-            class="slider"
-          />
+          <input id="years" type="range" formControlName="years" min="1" max="49" class="slider" />
           <div class="slider-labels">
             <span>1 year</span>
             <span>49 years</span>
@@ -232,9 +230,13 @@
           <label for="targetYearsFromNow">
             <span class="label-with-tooltip">
               Target Date
-              <app-tooltip text="When do you need the money? This could be retirement, a home purchase, or any financial goal." />
+              <app-tooltip
+                text="When do you need the money? This could be retirement, a home purchase, or any financial goal."
+              />
             </span>
-            <span class="slider-value">{{ targetYear }} ({{ form.value.targetYearsFromNow }} years)</span>
+            <span class="slider-value"
+              >{{ targetYear }} ({{ form.value.targetYearsFromNow }} years)</span
+            >
           </label>
           <input
             id="targetYearsFromNow"
@@ -271,10 +273,12 @@
     <button
       type="submit"
       class="submit-btn"
-      [disabled]="form.invalid
-        || (isCustomPortfolio && !isPortfolioValid)
-        || (mode === 'whatif' && !isHistoricalDateValid)
-        || (mode === 'whatif' && isCustomReturn)"
+      [disabled]="
+        form.invalid ||
+        (isCustomPortfolio && !isPortfolioValid) ||
+        (mode === 'whatif' && !isHistoricalDateValid) ||
+        (mode === 'whatif' && isCustomReturn)
+      "
     >
       @if (mode === 'whatif') {
         Replay History

@@ -1,12 +1,23 @@
 import { Component, EventEmitter, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators, FormsModule } from '@angular/forms';
-import { CustomSelectComponent, SelectOption } from '../../../../shared/components/custom-select/custom-select.component';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+  FormsModule,
+} from '@angular/forms';
+import {
+  CustomSelectComponent,
+  SelectOption,
+} from '../../../../shared/components/custom-select/custom-select.component';
 import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
 import {
   PortfolioAllocatorComponent,
   AllocationOutput,
 } from '../../../../shared/components/portfolio-allocator/portfolio-allocator.component';
+import { ApiService } from '../../../../core/services';
+import { IndexInfo } from '../../../../core/models';
 
 /**
  * Form data emitted when user submits a simulation request.
@@ -45,7 +56,14 @@ interface IndexOption extends SelectOption {
 @Component({
   selector: 'app-simulation-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, CustomSelectComponent, TooltipComponent, PortfolioAllocatorComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    FormsModule,
+    CustomSelectComponent,
+    TooltipComponent,
+    PortfolioAllocatorComponent,
+  ],
   templateUrl: './simulation-form.component.html',
   styleUrl: './simulation-form.component.scss',
 })
@@ -102,9 +120,6 @@ export class SimulationFormComponent {
     { value: 12, label: 'December' },
   ];
 
-  /** Available years for historical simulation (1993 → last year) */
-  readonly historicalYearOptions: SelectOption[] = this.buildHistoricalYearOptions();
-
   /** Selected growth option value (-1 means custom) */
   selectedGrowthOption = 0;
 
@@ -124,7 +139,16 @@ export class SimulationFormComponent {
     { symbol: 'EFA', weight: 20 },
   ];
 
+  /**
+   * Earliest available month per ETF symbol, populated from /api/v1/indexes.
+   * Drives the historical date picker so users can't ask for a date that
+   * predates the ETF's first Yahoo data point — which the backend would
+   * otherwise reject (and pre-fix used to silently clip the simulation).
+   */
+  private indexInfoBySymbol = new Map<string, IndexInfo>();
+
   private readonly fb = inject(FormBuilder);
+  private readonly apiService = inject(ApiService);
 
   constructor() {
     this.form = this.fb.group({
@@ -135,6 +159,18 @@ export class SimulationFormComponent {
       years: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetYearsFromNow: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetMonth: [12, [Validators.required, Validators.min(1), Validators.max(12)]],
+    });
+
+    this.apiService.getIndexes().subscribe({
+      next: response => {
+        for (const info of response.indexes) {
+          this.indexInfoBySymbol.set(info.symbol, info);
+        }
+      },
+      error: () => {
+        // Silent fallback: with no index metadata the picker stays unconstrained
+        // (1993+) and the backend will surface any genuinely invalid date.
+      },
     });
   }
 
@@ -196,19 +232,54 @@ export class SimulationFormComponent {
    * e.g. "January 2010 → Today (15 yrs)"
    */
   get historicalPeriodDescription(): string {
-    const months = this.monthOptions.find(m => m.value === this.selectedHistoricalMonth)?.label ?? '';
+    const months =
+      this.monthOptions.find(m => m.value === this.selectedHistoricalMonth)?.label ?? '';
     const years = this.currentYear - this.selectedHistoricalYear;
     const yearsLabel = years >= 1 ? ` (~${years} yr${years !== 1 ? 's' : ''})` : '';
     return `${months} ${this.selectedHistoricalYear} → Today${yearsLabel}`;
   }
 
-  /** Validate that the historical start date is in the past. */
-  get isHistoricalDateValid(): boolean {
+  /** True when the selected historical date is at least one month in the past. */
+  get isHistoricalDateInPast(): boolean {
     if (this.selectedHistoricalYear < this.currentYear) return true;
     if (this.selectedHistoricalYear === this.currentYear) {
       return this.selectedHistoricalMonth < this.currentMonth;
     }
     return false;
+  }
+
+  /**
+   * Validation error for the historical date, or null if the picker is valid.
+   *
+   * Two failure modes:
+   * - Date isn't in the past (can't replay the future).
+   * - Date predates the active ETF's first available data point (Yahoo has
+   *   no prices to replay). We surface this explicitly rather than silently
+   *   clamping the date forward, otherwise switching ETFs would change the
+   *   simulation duration without the user noticing — exactly the bug that
+   *   prompted this validation.
+   */
+  get historicalDateValidationError(): string | null {
+    if (!this.isHistoricalDateInPast) {
+      return 'Start date must be at least 1 month in the past';
+    }
+    const { year: minYear, month: minMonth } = this.effectiveMinHistoricalDate;
+    const beforeMin =
+      this.selectedHistoricalYear < minYear ||
+      (this.selectedHistoricalYear === minYear && this.selectedHistoricalMonth < minMonth);
+    if (beforeMin) {
+      const monthName = this.monthOptions.find(m => m.value === minMonth)?.label ?? '';
+      const symbols = this.activeHistoricalSymbols();
+      const subject =
+        symbols.length === 1 ? `${symbols[0]}'s` : "this portfolio's earliest member's";
+      return `Start date is before ${subject} earliest data (${monthName} ${minYear}). Please pick ${monthName} ${minYear} or later.`;
+    }
+    return null;
+  }
+
+  /** True when the historical picker has no validation error. */
+  get isHistoricalDateValid(): boolean {
+    return this.historicalDateValidationError === null;
   }
 
   /** Handle portfolio allocations change. */
@@ -252,13 +323,76 @@ export class SimulationFormComponent {
     this.simulate.emit(data);
   }
 
-  /** Build the list of selectable years for the historical start date. */
-  private buildHistoricalYearOptions(): SelectOption[] {
+  /**
+   * Earliest start date that's valid for the currently selected ETF (or the
+   * latest of all symbols in a custom portfolio). Falls back to Jan 1993 when
+   * the index metadata hasn't loaded yet so the picker stays unconstrained.
+   */
+  get effectiveMinHistoricalDate(): { year: number; month: number } {
+    const symbols = this.activeHistoricalSymbols();
+    let year = 1993;
+    let month = 1;
+    for (const symbol of symbols) {
+      const info = this.indexInfoBySymbol.get(symbol);
+      if (!info) continue;
+      if (
+        info.dataStartYear > year ||
+        (info.dataStartYear === year && info.dataStartMonth > month)
+      ) {
+        year = info.dataStartYear;
+        month = info.dataStartMonth;
+      }
+    }
+    return { year, month };
+  }
+
+  /**
+   * Human-readable label for the effective minimum (e.g. "August 2012") when
+   * any selected ETF actually constrains the picker; empty otherwise.
+   */
+  get effectiveMinHistoricalLabel(): string {
+    const { year, month } = this.effectiveMinHistoricalDate;
+    if (year <= 1993 && month <= 1) return '';
+    const monthName = this.monthOptions.find(m => m.value === month)?.label ?? '';
+    return `${monthName} ${year}`;
+  }
+
+  /** Years selectable for the historical start, constrained by the active ETF(s). */
+  get historicalYearOptions(): SelectOption[] {
+    const minYear = this.effectiveMinHistoricalDate.year;
     const options: SelectOption[] = [];
-    const maxYear = new Date().getFullYear();
-    for (let y = maxYear; y >= 1993; y--) {
+    for (let y = this.currentYear; y >= minYear; y--) {
       options.push({ value: y, label: String(y) });
     }
     return options;
+  }
+
+  /**
+   * Months selectable for the historical start. Filters out months before the
+   * effective minimum (when the year matches) and months in the current year
+   * that haven't elapsed yet (so the user can't pick "the future").
+   */
+  get historicalMonthOptions(): SelectOption[] {
+    const { year: minYear, month: minMonth } = this.effectiveMinHistoricalDate;
+    if (this.selectedHistoricalYear === minYear) {
+      return this.monthOptions.filter(m => Number(m.value) >= minMonth);
+    }
+    if (this.selectedHistoricalYear === this.currentYear) {
+      return this.monthOptions.filter(m => Number(m.value) < this.currentMonth);
+    }
+    return this.monthOptions;
+  }
+
+  /**
+   * Symbols that should constrain the historical picker right now: the
+   * portfolio members in custom-portfolio mode, the single ETF otherwise.
+   * Returns empty when neither is set (e.g. "Custom rate" — which whatif mode
+   * already disallows submission for).
+   */
+  private activeHistoricalSymbols(): string[] {
+    if (this.isCustomPortfolio) {
+      return this.portfolioAllocations.filter(a => a.weight > 0).map(a => a.symbol);
+    }
+    return this.selectedIndexSymbol ? [this.selectedIndexSymbol] : [];
   }
 }

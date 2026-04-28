@@ -3,3 +3,4 @@
  */
 export * from './simulation.model';
 export * from './health.model';
+export * from './index.model';

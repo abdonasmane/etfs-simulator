@@ -11,16 +11,22 @@ import (
 
 // IndexInfo contains metadata and statistics for a market index.
 type IndexInfo struct {
-	Symbol             string  `json:"symbol"`
-	Name               string  `json:"name"`
-	Description        string  `json:"description"`
-	MedianReturn       float64 `json:"medianReturn"`      // 50th percentile
-	PessimisticReturn  float64 `json:"pessimisticReturn"` // 5th percentile
-	OptimisticReturn   float64 `json:"optimisticReturn"`  // 95th percentile
-	StandardDeviation  float64 `json:"standardDeviation"`
-	DataYears          float64 `json:"dataYears"`
-	DataStartDate      string  `json:"dataStartDate"`
-	RollingPeriodYears int     `json:"rollingPeriodYears"` // e.g., 10 or 20 years
+	Symbol            string  `json:"symbol"`
+	Name              string  `json:"name"`
+	Description       string  `json:"description"`
+	MedianReturn      float64 `json:"medianReturn"`      // 50th percentile
+	PessimisticReturn float64 `json:"pessimisticReturn"` // 5th percentile
+	OptimisticReturn  float64 `json:"optimisticReturn"`  // 95th percentile
+	StandardDeviation float64 `json:"standardDeviation"`
+	DataYears         float64 `json:"dataYears"`
+	DataStartDate     string  `json:"dataStartDate"`
+	// DataStartYear / DataStartMonth expose the first available month in a
+	// machine-readable form so the historical-simulation handler and the
+	// frontend year picker can validate user-supplied start dates without
+	// re-parsing the formatted DataStartDate string.
+	DataStartYear      int `json:"dataStartYear"`
+	DataStartMonth     int `json:"dataStartMonth"`
+	RollingPeriodYears int `json:"rollingPeriodYears"` // e.g., 10 or 20 years
 }
 
 // SupportedIndex defines a supported index with its ETF symbol.
@@ -135,6 +141,8 @@ func (s *IndexService) fetchAndCalculate(idx SupportedIndex) (*IndexInfo, error)
 		StandardDeviation:  roundTo2Decimals(stats.StandardDeviation),
 		DataYears:          roundTo1Decimal(stats.TotalYears),
 		DataStartDate:      stats.DataStartDate.Format("Jan 2006"),
+		DataStartYear:      stats.DataStartDate.Year(),
+		DataStartMonth:     int(stats.DataStartDate.Month()),
 		RollingPeriodYears: rollingYears,
 	}, nil
 }

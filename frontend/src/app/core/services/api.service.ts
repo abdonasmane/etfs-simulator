@@ -6,6 +6,7 @@ import { catchError } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 import {
   HealthResponse,
+  IndexesResponse,
   SimulateByYearsRequest,
   SimulateByYearsResponse,
   SimulateByTargetRequest,
@@ -36,7 +37,19 @@ export class ApiService {
    * GET /health
    */
   getHealth(): Observable<HealthResponse> {
-    return this.http.get<HealthResponse>(`${this.baseUrl}/health`).pipe(catchError(this.handleError));
+    return this.http
+      .get<HealthResponse>(`${this.baseUrl}/health`)
+      .pipe(catchError(this.handleError));
+  }
+
+  /**
+   * List supported ETFs with their historical statistics.
+   * GET /api/v1/indexes
+   */
+  getIndexes(): Observable<IndexesResponse> {
+    return this.http
+      .get<IndexesResponse>(`${this.baseUrl}/api/v1/indexes`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
