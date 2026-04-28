@@ -1,57 +1,156 @@
 <div class="simulation-results">
-  <!-- Hero Result -->
-  <div class="hero-result">
-
-    @if (summary.isHistorical) {
-      <div class="hero-label">
-        <span class="hero-historical-badge">Real Historical Data</span>
+  @if (comparison) {
+    <div class="compare-hero fade-in">
+      <div class="compare-hero-label">
+        <span class="hero-historical-badge">Head-to-Head · Real Historical Data</span>
       </div>
-      <div class="hero-sublabel">
-        Your portfolio today · invested since {{ summary.historicalStartDate }}
+      <div class="compare-hero-sublabel">
+        Same plan, different ETFs · since
+        {{
+          comparison.primary.summary?.historicalStartDate ??
+            comparison.secondary.summary?.historicalStartDate
+        }}
       </div>
-    } @else {
-      <div class="hero-label">
-        @if (summary.hasRange) {
-          Expected Portfolio Value by {{ summary.targetDate }}
-        } @else {
-          Projected Portfolio Value by {{ summary.targetDate }}
-        }
+
+      <div class="compare-cards">
+        <!-- Primary side -->
+        <div
+          class="compare-card"
+          [class.compare-card--winner]="winningSide === 'primary'"
+          [class.compare-card--errored]="!comparison.primary.summary"
+        >
+          <div class="compare-card-header">
+            <span class="compare-symbol">{{ comparison.primary.symbol }}</span>
+            @if (winningSide === 'primary') {
+              <span class="compare-winner-badge">Winner</span>
+            }
+          </div>
+          @if (comparison.primary.summary) {
+            <div class="compare-final-value">
+              {{ comparison.primary.summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            </div>
+            <div class="compare-gain">
+              <span class="compare-gain-amount positive">
+                +{{ comparison.primary.summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+              </span>
+              <span class="compare-gain-percent">
+                (+{{ comparison.primary.summary.percentageGain | number: '1.1-1' }}%)
+              </span>
+            </div>
+            @if (comparison.primary.summary.annualizedReturn !== undefined) {
+              <div class="compare-annualized">
+                ~{{ comparison.primary.summary.annualizedReturn | number: '1.1-1' }}% annualized
+              </div>
+            }
+          } @else {
+            <div class="compare-error">
+              Couldn't load data
+              <span class="compare-error-detail">{{ comparison.primary.error }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="compare-vs">VS</div>
+
+        <!-- Secondary side -->
+        <div
+          class="compare-card"
+          [class.compare-card--winner]="winningSide === 'secondary'"
+          [class.compare-card--errored]="!comparison.secondary.summary"
+        >
+          <div class="compare-card-header">
+            <span class="compare-symbol secondary">{{ comparison.secondary.symbol }}</span>
+            @if (winningSide === 'secondary') {
+              <span class="compare-winner-badge">Winner</span>
+            }
+          </div>
+          @if (comparison.secondary.summary) {
+            <div class="compare-final-value">
+              {{ comparison.secondary.summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            </div>
+            <div class="compare-gain">
+              <span class="compare-gain-amount positive">
+                +{{ comparison.secondary.summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+              </span>
+              <span class="compare-gain-percent">
+                (+{{ comparison.secondary.summary.percentageGain | number: '1.1-1' }}%)
+              </span>
+            </div>
+            @if (comparison.secondary.summary.annualizedReturn !== undefined) {
+              <div class="compare-annualized">
+                ~{{ comparison.secondary.summary.annualizedReturn | number: '1.1-1' }}% annualized
+              </div>
+            }
+          } @else {
+            <div class="compare-error">
+              Couldn't load data
+              <span class="compare-error-detail">{{ comparison.secondary.error }}</span>
+            </div>
+          }
+        </div>
       </div>
-    }
 
-    <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+      @if (winningSide === null && comparison.primary.summary && comparison.secondary.summary) {
+        <div class="compare-tie">It's a tie — both ended at the same final value.</div>
+      }
+    </div>
+  } @else {
+    <!-- Hero Result -->
+    <div class="hero-result">
+      @if (summary.isHistorical) {
+        <div class="hero-label">
+          <span class="hero-historical-badge">Real Historical Data</span>
+        </div>
+        <div class="hero-sublabel">
+          Your portfolio today · invested since {{ summary.historicalStartDate }}
+        </div>
+      } @else {
+        <div class="hero-label">
+          @if (summary.hasRange) {
+            Expected Portfolio Value by {{ summary.targetDate }}
+          } @else {
+            Projected Portfolio Value by {{ summary.targetDate }}
+          }
+        </div>
+      }
 
-    @if (!summary.isHistorical && summary.hasRange && summary.pessimisticValue && summary.optimisticValue) {
-      <div class="hero-range">
-        <span class="range-label">Historical range:</span>
-        <span class="range-values">
-          {{ summary.pessimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
-          <span class="range-divider">—</span>
-          {{ summary.optimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+      <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+
+      @if (
+        !summary.isHistorical &&
+        summary.hasRange &&
+        summary.pessimisticValue &&
+        summary.optimisticValue
+      ) {
+        <div class="hero-range">
+          <span class="range-label">Historical range:</span>
+          <span class="range-values">
+            {{ summary.pessimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            <span class="range-divider">—</span>
+            {{ summary.optimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+          </span>
+        </div>
+      }
+
+      <div class="hero-gain">
+        <span class="gain-badge">
+          +{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+          <span class="gain-percent">(+{{ summary.percentageGain | number: '1.1-1' }}%)</span>
         </span>
       </div>
-    }
 
-    <div class="hero-gain">
-      <span class="gain-badge">
-        +{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
-        <span class="gain-percent">(+{{ summary.percentageGain | number: '1.1-1' }}%)</span>
-      </span>
+      @if (summary.isHistorical && summary.annualizedReturn !== undefined) {
+        <div class="hero-annualized">
+          ~{{ summary.annualizedReturn | number: '1.1-1' }}% avg. annual return over
+          {{ summary.totalMonths / 12 | number: '1.0-0' }} years
+        </div>
+      }
+
+      @if (!summary.isHistorical && !summary.hasRange) {
+        <div class="custom-rate-notice">Using custom rate — no historical range available</div>
+      }
     </div>
-
-    @if (summary.isHistorical && summary.annualizedReturn !== undefined) {
-      <div class="hero-annualized">
-        ~{{ summary.annualizedReturn | number: '1.1-1' }}% avg. annual return
-        over {{ (summary.totalMonths / 12) | number: '1.0-0' }} years
-      </div>
-    }
-
-    @if (!summary.isHistorical && !summary.hasRange) {
-      <div class="custom-rate-notice">
-        Using custom rate — no historical range available
-      </div>
-    }
-  </div>
+  }
 
   <!-- Portfolio Breakdown (when using custom portfolio) -->
   @if (summary.portfolio && summary.portfolio.length > 1) {
@@ -59,13 +158,15 @@
       <div class="portfolio-header">
         <span class="portfolio-title">Your Portfolio Mix</span>
         @if (summary.blendedMedianReturn) {
-          <span class="blended-return">~{{ summary.blendedMedianReturn | number: '1.1-1' }}% blended return</span>
+          <span class="blended-return"
+            >~{{ summary.blendedMedianReturn | number: '1.1-1' }}% blended return</span
+          >
         }
       </div>
       <div class="portfolio-bar">
         @for (etf of summary.portfolio; track etf.symbol) {
-          <div 
-            class="bar-segment" 
+          <div
+            class="bar-segment"
             [style.width.%]="etf.weight"
             [style.background]="getETFColor(etf.symbol)"
             [title]="etf.name + ': ' + etf.weight + '%'"
@@ -86,55 +187,72 @@
   }
 
   <!-- Chart -->
-  <app-growth-chart [projections]="projections" [isHistorical]="summary.isHistorical ?? false" />
+  <app-growth-chart
+    [projections]="projections"
+    [isHistorical]="summary.isHistorical ?? false"
+    [primaryLabel]="primaryChartLabel"
+    [compareSeries]="secondaryChartSeries"
+  />
 
-  <!-- Summary Stats -->
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-content">
-        <div class="stat-value">{{ summary.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
-        <div class="stat-label">Total Contributed</div>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-content">
-        <div class="stat-value positive">{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
-        @if (summary.hasRange && summary.pessimisticGain && summary.optimisticGain) {
-          <div class="stat-range">
-            {{ summary.pessimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }} — 
-            {{ summary.optimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+  <!-- Summary Stats — hidden in compare mode (the dual cards above already show finals/gains) -->
+  @if (!comparison) {
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-content">
+          <div class="stat-value">
+            {{ summary.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}
           </div>
-        }
-        <div class="stat-label">Investment Returns</div>
+          <div class="stat-label">Total Contributed</div>
+        </div>
       </div>
-    </div>
 
-    <div class="stat-card">
-      <div class="stat-content">
-        <div class="stat-value">{{ (summary.totalMonths / 12) | number: '1.1-1' }} years</div>
-        <div class="stat-label">Investment Period</div>
-      </div>
-    </div>
-
-    <div class="stat-card">
-      <div class="stat-content">
-        <div class="stat-value positive">+{{ summary.percentageGain | number: '1.1-1' }}%</div>
-        @if (summary.hasRange && summary.pessimisticPercent !== undefined && summary.optimisticPercent !== undefined) {
-          <div class="stat-range">
-            +{{ summary.pessimisticPercent | number: '1.1-1' }}% — +{{ summary.optimisticPercent | number: '1.1-1' }}%
+      <div class="stat-card">
+        <div class="stat-content">
+          <div class="stat-value positive">
+            {{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
           </div>
-        }
-        <div class="stat-label">Total Return</div>
+          @if (summary.hasRange && summary.pessimisticGain && summary.optimisticGain) {
+            <div class="stat-range">
+              {{ summary.pessimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }} —
+              {{ summary.optimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            </div>
+          }
+          <div class="stat-label">Investment Returns</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-content">
+          <div class="stat-value">{{ summary.totalMonths / 12 | number: '1.1-1' }} years</div>
+          <div class="stat-label">Investment Period</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-content">
+          <div class="stat-value positive">+{{ summary.percentageGain | number: '1.1-1' }}%</div>
+          @if (
+            summary.hasRange &&
+            summary.pessimisticPercent !== undefined &&
+            summary.optimisticPercent !== undefined
+          ) {
+            <div class="stat-range">
+              +{{ summary.pessimisticPercent | number: '1.1-1' }}% — +{{
+                summary.optimisticPercent | number: '1.1-1'
+              }}%
+            </div>
+          }
+          <div class="stat-label">Total Return</div>
+        </div>
       </div>
     </div>
-  </div>
+  }
 
   <!-- Contribution Milestones -->
   @if (hasContributionGrowth) {
     <div class="milestones-section">
-      <div 
-        class="milestones-header" 
+      <div
+        class="milestones-header"
         (click)="toggleMilestones()"
         (keydown.enter)="toggleMilestones()"
         (keydown.space)="toggleMilestones()"
@@ -144,21 +262,23 @@
       >
         <h3>Contribution Growth</h3>
         <span class="milestone-summary">
-          €{{ summary.contributionMilestones[0]?.monthlyContribution | number: '1.0-0' }}/mo 
-          → 
-          €{{ summary.finalMonthlyContribution | number: '1.0-0' }}/mo
+          €{{ summary.contributionMilestones[0]?.monthlyContribution | number: '1.0-0' }}/mo → €{{
+            summary.finalMonthlyContribution | number: '1.0-0'
+          }}/mo
         </span>
         <button class="expand-btn">
           {{ showMilestones ? '−' : '+' }}
         </button>
       </div>
-      
+
       @if (showMilestones) {
         <div class="milestones-grid" @expandCollapse>
           @for (milestone of summary.contributionMilestones; track milestone.year) {
             <div class="milestone-card">
               <div class="milestone-year">Year {{ milestone.yearsFromNow }}</div>
-              <div class="milestone-value">€{{ milestone.monthlyContribution | number: '1.0-0' }}/mo</div>
+              <div class="milestone-value">
+                €{{ milestone.monthlyContribution | number: '1.0-0' }}/mo
+              </div>
             </div>
           }
         </div>
@@ -176,31 +296,100 @@
     </div>
 
     <div class="table-container">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th class="align-right">Contributed</th>
-            <th class="align-right">Portfolio Value</th>
-            <th class="align-right">Gain</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (projection of displayedProjections; track projection.year + '-' + projection.month) {
+      @if (comparison && comparisonRows.length > 0) {
+        <table class="compare-table">
+          <thead>
             <tr>
-              <td class="date-cell">
-                <span class="date-month">{{ getMonthName(projection.month) }}</span>
-                <span class="date-year">{{ projection.year }}</span>
-              </td>
-              <td class="align-right">{{ projection.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}</td>
-              <td class="align-right value-cell">{{ projection.portfolioValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</td>
-              <td class="align-right gain-cell">
-                +{{ getGain(projection) | currency: 'EUR' : 'symbol' : '1.0-0' }}
-              </td>
+              <th>Date</th>
+              <th class="align-right">Contributed</th>
+              <th class="align-right">{{ comparison.primary.symbol }}</th>
+              <th class="align-right">{{ comparison.secondary.symbol }}</th>
+              <th class="align-right">Δ</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (row of comparisonRows; track row.year + '-' + row.month) {
+              <tr>
+                <td class="date-cell">
+                  <span class="date-month">{{ getMonthName(row.month) }}</span>
+                  <span class="date-year">{{ row.year }}</span>
+                </td>
+                <td class="align-right">
+                  {{ row.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                </td>
+                <td
+                  class="align-right value-cell"
+                  [class.cell-winner]="row.rowWinner === 'primary'"
+                >
+                  <div>{{ row.primaryValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+                  <div class="cell-gain">
+                    +{{ row.primaryGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                  </div>
+                </td>
+                <td
+                  class="align-right value-cell"
+                  [class.cell-winner]="row.rowWinner === 'secondary'"
+                >
+                  <div>{{ row.secondaryValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+                  <div class="cell-gain">
+                    +{{ row.secondaryGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                  </div>
+                </td>
+                <td class="align-right delta-cell">
+                  @if (row.rowWinner === 'primary') {
+                    <span class="delta-primary">
+                      {{ comparison.primary.symbol }} +{{
+                        row.primaryValue - row.secondaryValue | currency: 'EUR' : 'symbol' : '1.0-0'
+                      }}
+                    </span>
+                  } @else if (row.rowWinner === 'secondary') {
+                    <span class="delta-secondary">
+                      {{ comparison.secondary.symbol }} +{{
+                        row.secondaryValue - row.primaryValue | currency: 'EUR' : 'symbol' : '1.0-0'
+                      }}
+                    </span>
+                  } @else {
+                    <span class="delta-tie">tie</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th class="align-right">Contributed</th>
+              <th class="align-right">Portfolio Value</th>
+              <th class="align-right">Gain</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (
+              projection of displayedProjections;
+              track projection.year + '-' + projection.month
+            ) {
+              <tr>
+                <td class="date-cell">
+                  <span class="date-month">{{ getMonthName(projection.month) }}</span>
+                  <span class="date-year">{{ projection.year }}</span>
+                </td>
+                <td class="align-right">
+                  {{ projection.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                </td>
+                <td class="align-right value-cell">
+                  {{ projection.portfolioValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                </td>
+                <td class="align-right gain-cell">
+                  +{{ getGain(projection) | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
     </div>
   </div>
 </div>

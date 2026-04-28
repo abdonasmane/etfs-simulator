@@ -274,6 +274,39 @@ export interface SimulateHistoricalResponse {
   summary: HistoricalSimulateSummary;
 }
 
+// --- Comparison (What If: ETF A vs ETF B) ---
+
+/**
+ * Per-side state of an ETF-vs-ETF historical comparison. Keeps results
+ * structured so we can render partial state (one side errored) without
+ * losing the side that succeeded.
+ */
+export interface ComparisonSide {
+  /** ETF symbol for this side (e.g., "SPY"). */
+  symbol: string;
+
+  /** Human-readable name when known (e.g., "S&P 500 (SPY)"). */
+  name: string;
+
+  /** Successful summary, or undefined when the fetch failed. */
+  summary?: SimulateSummary;
+
+  /** Successful projections, or undefined when the fetch failed. */
+  projections?: MonthProjection[];
+
+  /** Backend error message when the fetch failed for this side. */
+  error?: string;
+}
+
+/**
+ * Side-by-side ETF comparison results. The simulation page emits this when
+ * the user enabled "Compare with another ETF" in What If mode.
+ */
+export interface ComparisonResult {
+  primary: ComparisonSide;
+  secondary: ComparisonSide;
+}
+
 // --- Error Response ---
 
 /**

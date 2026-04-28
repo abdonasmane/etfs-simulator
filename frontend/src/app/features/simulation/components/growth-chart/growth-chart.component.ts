@@ -18,6 +18,14 @@ import { ThemeService } from '../../../../core/services';
 // Register Chart.js components
 Chart.register(...registerables);
 
+/** A secondary projection series rendered alongside the primary one. */
+export interface CompareSeries {
+  /** Display label (typically the ETF symbol). */
+  label: string;
+  /** Projection points for this ETF, same shape as the primary input. */
+  projections: MonthProjection[];
+}
+
 /**
  * Interactive area chart showing portfolio growth over time.
  * Similar to iShares savings calculator visualization.
@@ -52,6 +60,17 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
   /** When true, renders chart in historical amber/gold color scheme */
   @Input() isHistorical = false;
 
+  /** Optional label for the primary line when comparing (e.g. "SPY"). */
+  @Input() primaryLabel: string | null = null;
+
+  /**
+   * Optional second projection series for ETF-vs-ETF comparison. When set,
+   * the chart hides the "Total Contributed" line (it's identical for both
+   * sides — comparing returns is the point) and renders both series with
+   * distinct colors.
+   */
+  @Input() compareSeries: CompareSeries | null = null;
+
   @ViewChild('chartCanvas') chartCanvas!: ElementRef<HTMLCanvasElement>;
 
   private readonly themeService = inject(ThemeService);
@@ -75,7 +94,12 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if ((changes['projections'] || changes['isHistorical']) && this.chart) {
+    const relevant =
+      changes['projections'] ||
+      changes['isHistorical'] ||
+      changes['compareSeries'] ||
+      changes['primaryLabel'];
+    if (relevant && this.chart) {
       this.updateChart();
     }
   }
@@ -91,6 +115,8 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     optimistic: string;
     pessimistic: string;
     tooltipBg: string;
+    compare: string;
+    compareLight: string;
   } {
     const isDark = this.themeService.isDark();
     return isDark
@@ -104,6 +130,8 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
           optimistic: 'rgba(52, 211, 153, 0.6)',
           pessimistic: 'rgba(248, 113, 113, 0.6)',
           tooltipBg: '#1e293b',
+          compare: '#f59e0b',
+          compareLight: 'rgba(245, 158, 11, 0.2)',
         }
       : {
           text: '#1a1a2e',
@@ -115,6 +143,8 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
           optimistic: 'rgba(34, 197, 94, 0.5)',
           pessimistic: 'rgba(239, 68, 68, 0.5)',
           tooltipBg: '#1a1a2e',
+          compare: '#d97706',
+          compareLight: 'rgba(217, 119, 6, 0.15)',
         };
   }
 
@@ -201,7 +231,8 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
               color: colors.grid,
             },
             ticks: {
-              callback: (value): string => `€${Number(value).toLocaleString('de-DE', { notation: 'compact' })}`,
+              callback: (value): string =>
+                `€${Number(value).toLocaleString('de-DE', { notation: 'compact' })}`,
               font: {
                 size: 11,
               },
@@ -232,6 +263,17 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
 
   /**
    * Build chart datasets, including range area if available.
+   *
+   * Layout precedence:
+   *   1. range area (pessimistic/optimistic) when present — drawn first so the
+   *      median line sits on top.
+   *   2. comparison series when present — two portfolio-value lines, no fills
+   *      (fills occlude each other; better to read as overlay).
+   *   3. otherwise: single portfolio line + filled "Total Contributed".
+   *
+   * When comparing, we omit the contributions line: contributions are
+   * identical between both sides (same form inputs), so it adds noise without
+   * helping the comparison.
    */
   private buildDatasets(
     ctx: CanvasRenderingContext2D,
@@ -239,10 +281,57 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
   ): Chart['data']['datasets'] {
     const datasets: Chart['data']['datasets'] = [];
     const colors = this.colors;
+    const isDark = this.themeService.isDark();
 
-    // If we have range data, add the confidence area first (so it's behind)
+    if (this.compareSeries) {
+      const primaryLabel = this.primaryLabel ?? 'Primary';
+      datasets.push({
+        label: primaryLabel,
+        data: data.portfolioValues,
+        borderColor: colors.accent,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: colors.accent,
+        pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
+        pointHoverBorderWidth: 2,
+        borderWidth: 2.5,
+      });
+
+      datasets.push({
+        label: this.compareSeries.label,
+        data: data.compareValues ?? [],
+        borderColor: colors.compare,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: colors.compare,
+        pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
+        pointHoverBorderWidth: 2,
+        borderWidth: 2.5,
+      });
+
+      datasets.push({
+        label: 'Total Contributed',
+        data: data.contributions,
+        borderColor: colors.contributed,
+        backgroundColor: 'transparent',
+        fill: false,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 6,
+        borderWidth: 1.5,
+        borderDash: [5, 5],
+      });
+
+      return datasets;
+    }
+
     if (data.optimisticValues && data.pessimisticValues) {
-      // Optimistic line (upper bound) - will be filled down to pessimistic
       datasets.push({
         label: 'Optimistic',
         data: data.optimisticValues,
@@ -256,13 +345,12 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
         borderDash: [4, 4],
       });
 
-      // Pessimistic line (lower bound)
       datasets.push({
         label: 'Pessimistic',
         data: data.pessimisticValues,
         borderColor: colors.pessimistic,
         backgroundColor: colors.accentLight,
-        fill: '-1', // Fill to previous dataset (optimistic)
+        fill: '-1',
         tension: 0.4,
         pointRadius: 0,
         pointHoverRadius: 4,
@@ -271,23 +359,27 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       });
     }
 
-    // Main portfolio value line (median / actual)
     datasets.push({
-      label: this.isHistorical ? 'Actual Portfolio Value' : (this.hasRangeData ? 'Expected (Median)' : 'Portfolio Value'),
+      label: this.isHistorical
+        ? 'Actual Portfolio Value'
+        : this.hasRangeData
+          ? 'Expected (Median)'
+          : 'Portfolio Value',
       data: data.portfolioValues,
       borderColor: colors.accent,
-      backgroundColor: this.hasRangeData ? 'transparent' : this.createGradient(ctx, colors.accent, 0.3),
+      backgroundColor: this.hasRangeData
+        ? 'transparent'
+        : this.createGradient(ctx, colors.accent, 0.3),
       fill: !this.hasRangeData,
       tension: 0.4,
       pointRadius: 0,
       pointHoverRadius: 6,
       pointHoverBackgroundColor: colors.accent,
-      pointHoverBorderColor: this.themeService.isDark() ? '#1e293b' : '#ffffff',
+      pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
       pointHoverBorderWidth: 2,
       borderWidth: 2.5,
     });
 
-    // Total contributed line
     datasets.push({
       label: 'Total Contributed',
       data: data.contributions,
@@ -298,7 +390,7 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       pointRadius: 0,
       pointHoverRadius: 6,
       pointHoverBackgroundColor: colors.contributed,
-      pointHoverBorderColor: this.themeService.isDark() ? '#1e293b' : '#ffffff',
+      pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
       pointHoverBorderWidth: 2,
       borderDash: [5, 5],
     });
@@ -319,9 +411,9 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     contributions: number[];
     pessimisticValues?: number[];
     optimisticValues?: number[];
+    compareValues?: number[];
   } {
-    // Sample data points for cleaner chart (show yearly or every 6 months)
-    const sampledProjections = this.sampleProjections();
+    const sampledProjections = this.sampleProjections(this.projections);
 
     const data: ReturnType<typeof this.getChartData> = {
       labels: sampledProjections.map(p => this.formatDate(p.year, p.month)),
@@ -329,34 +421,59 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       contributions: sampledProjections.map(p => p.totalContributed),
     };
 
-    // Add range data if available
     if (this.hasRangeData) {
       data.pessimisticValues = sampledProjections.map(p => p.pessimisticValue!);
       data.optimisticValues = sampledProjections.map(p => p.optimisticValue!);
     }
 
+    // Sample the comparison series with the same step to keep both lines
+    // aligned on the x-axis, then truncate to whichever side is shorter (a
+    // missing leading Yahoo bar can shift one ETF by a month).
+    if (this.compareSeries) {
+      const sampledCompare = this.sampleProjections(this.compareSeries.projections);
+      const len = Math.min(sampledProjections.length, sampledCompare.length);
+      data.labels = data.labels.slice(0, len);
+      data.portfolioValues = data.portfolioValues.slice(0, len);
+      data.contributions = data.contributions.slice(0, len);
+      data.compareValues = sampledCompare.slice(0, len).map(p => p.portfolioValue);
+    }
+
     return data;
   }
 
-  private sampleProjections(): MonthProjection[] {
-    if (this.projections.length <= 24) {
-      // Less than 2 years - show all months
-      return this.projections;
-    } else if (this.projections.length <= 60) {
-      // 2-5 years - show every 3 months
-      return this.projections.filter((_, i) => i % 3 === 0 || i === this.projections.length - 1);
+  private sampleProjections(projections: MonthProjection[]): MonthProjection[] {
+    if (projections.length <= 24) {
+      return projections;
+    } else if (projections.length <= 60) {
+      return projections.filter((_, i) => i % 3 === 0 || i === projections.length - 1);
     } else {
-      // More than 5 years - show every 6 months
-      return this.projections.filter((_, i) => i % 6 === 0 || i === this.projections.length - 1);
+      return projections.filter((_, i) => i % 6 === 0 || i === projections.length - 1);
     }
   }
 
   private formatDate(year: number, month: number): string {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return `${monthNames[month - 1]} ${year}`;
   }
 
-  private createGradient(ctx: CanvasRenderingContext2D, color: string, opacity: number): CanvasGradient {
+  private createGradient(
+    ctx: CanvasRenderingContext2D,
+    color: string,
+    opacity: number
+  ): CanvasGradient {
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
     gradient.addColorStop(0, this.hexToRgba(color, opacity));
     gradient.addColorStop(1, this.hexToRgba(color, 0));

@@ -55,7 +55,9 @@
     font-weight: 700;
     letter-spacing: -1px;
     margin-bottom: 0.75rem;
-    transition: transform 0.3s ease, opacity 0.3s ease;
+    transition:
+      transform 0.3s ease,
+      opacity 0.3s ease;
 
     @media (max-width: 600px) {
       font-size: 2.25rem;
@@ -116,6 +118,173 @@
   }
 }
 
+// Compare hero (ETF vs ETF)
+.compare-hero {
+  background: var(--gradient-hero);
+  border-radius: 16px;
+  padding: 1.75rem 1.5rem 1.5rem;
+  color: white;
+  box-shadow: 0 10px 40px var(--color-hero-shadow);
+
+  .compare-hero-label {
+    text-align: center;
+    margin-bottom: 0.25rem;
+  }
+
+  .compare-hero-sublabel {
+    text-align: center;
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-bottom: 1.25rem;
+  }
+
+  .compare-cards {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: stretch;
+    gap: 0.75rem;
+
+    @media (max-width: 600px) {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  }
+
+  .compare-card {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+    transition: all 0.2s ease;
+
+    &--winner {
+      background: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    &--errored {
+      background: rgba(0, 0, 0, 0.18);
+      border-color: rgba(255, 255, 255, 0.12);
+      opacity: 0.85;
+    }
+  }
+
+  .compare-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .compare-symbol {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.65rem;
+    border-radius: 6px;
+
+    // Reuse the compare-line color from the chart so legend ↔ chart match
+    &.secondary {
+      background: rgba(245, 158, 11, 0.85);
+      color: #1a1a2e;
+    }
+  }
+
+  .compare-winner-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    background: #10b981;
+    color: white;
+    padding: 0.15rem 0.5rem;
+    border-radius: 100px;
+  }
+
+  .compare-final-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 0.35rem;
+
+    @media (max-width: 600px) {
+      font-size: 1.4rem;
+    }
+  }
+
+  .compare-gain {
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+
+    .compare-gain-amount {
+      font-weight: 600;
+      color: #6ee7b7;
+    }
+
+    .compare-gain-percent {
+      opacity: 0.85;
+      margin-left: 0.25rem;
+    }
+  }
+
+  .compare-annualized {
+    font-size: 0.75rem;
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    display: inline-block;
+  }
+
+  .compare-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 1rem 0;
+    font-size: 0.85rem;
+    color: #fecaca;
+
+    .compare-error-detail {
+      font-size: 0.7rem;
+      opacity: 0.7;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  .compare-vs {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    opacity: 0.65;
+
+    @media (max-width: 600px) {
+      padding: 0.25rem 0;
+    }
+  }
+
+  .compare-tie {
+    margin-top: 0.875rem;
+    text-align: center;
+    font-size: 0.85rem;
+    opacity: 0.85;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 0.45rem 0.875rem;
+    border-radius: 8px;
+    display: inline-block;
+    margin-left: 50%;
+    transform: translateX(-50%);
+  }
+}
+
 // Portfolio Breakdown
 .portfolio-breakdown {
   background: var(--color-bg-secondary);
@@ -123,7 +292,9 @@
   border-radius: 12px;
   padding: 1rem 1.25rem;
   box-shadow: 0 2px 4px var(--color-card-shadow);
-  transition: background-color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
 
   .portfolio-header {
     display: flex;
@@ -148,7 +319,9 @@
     background: var(--color-accent-light);
     padding: 0.25rem 0.5rem;
     border-radius: 6px;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
   .portfolio-bar {
@@ -220,7 +393,10 @@
   border-radius: 12px;
   padding: 0.875rem 1rem;
   box-shadow: 0 2px 4px var(--color-card-shadow);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.3s ease;
 
   &:hover {
     transform: translateY(-2px);
@@ -418,6 +594,13 @@
     font-size: 1rem;
     font-weight: 600;
     color: var(--color-text-primary);
+
+    .projections-side-hint {
+      margin-left: 0.35rem;
+      font-weight: 500;
+      color: var(--color-text-muted);
+      font-size: 0.85rem;
+    }
   }
 
   .toggle-btn {
@@ -521,4 +704,65 @@ table {
     color: var(--color-success);
     font-weight: 500;
   }
+}
+
+// Compare table — value/gain stacked per side, winner cell highlighted, Δ column
+.compare-table {
+  .value-cell {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    line-height: 1.25;
+  }
+
+  .cell-gain {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--color-success);
+    margin-top: 0.125rem;
+  }
+
+  .cell-winner {
+    background: var(--color-success-light);
+
+    .cell-gain {
+      font-weight: 600;
+    }
+  }
+
+  .delta-cell {
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+
+    .delta-primary {
+      color: var(--color-accent);
+    }
+
+    // Match the orange the chart uses for the secondary line; brighter in dark
+    .delta-secondary {
+      color: #d97706;
+    }
+
+    .delta-tie {
+      color: var(--color-text-muted);
+      font-weight: 500;
+    }
+  }
+
+  // Override the default last-row highlight so the winner cell still wins.
+  tbody tr:last-child {
+    background: var(--color-bg-tertiary);
+
+    .cell-gain {
+      color: var(--color-success);
+    }
+
+    .cell-winner {
+      background: var(--color-success-light);
+    }
+  }
+}
+
+[data-theme='dark'] .compare-table .delta-cell .delta-secondary {
+  color: #f59e0b;
 }

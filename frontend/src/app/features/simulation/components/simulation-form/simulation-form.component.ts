@@ -40,6 +40,11 @@ export interface SimulationFormData {
   indexSymbol?: string;
   /** Annual return rate - only used when no indexSymbol or portfolio is provided */
   annualReturnRate?: number;
+  /**
+   * Second ETF symbol for side-by-side comparison. Only set in What If mode.
+   * The page runs a parallel simulation and renders both on the same chart.
+   */
+  compareIndexSymbol?: string;
 }
 
 /**
@@ -126,6 +131,14 @@ export class SimulationFormComponent {
   /** Selected return option value (-1 means custom, positive values are index IDs) */
   selectedReturnOption = 1; // Default to S&P 500
 
+  /**
+   * Selected second ETF for comparison mode (What If only). Null when comparison
+   * is off. Holds the same `value` as `selectedReturnOption` (an index into
+   * `returnOptions`), not a symbol — so we can reuse the same dropdown options
+   * and detect "same ETF picked twice" without string-matching.
+   */
+  selectedCompareReturnOption: number | null = null;
+
   /** Selected historical start year */
   selectedHistoricalYear = 2010;
 
@@ -180,9 +193,61 @@ export class SimulationFormComponent {
     return option?.symbol;
   }
 
-  /** Switch between simulation modes. */
+  /** Symbol of the second ETF picked for comparison, or undefined if off. */
+  get selectedCompareIndexSymbol(): string | undefined {
+    if (this.selectedCompareReturnOption === null) return undefined;
+    const option = this.returnOptions.find(o => o.value === this.selectedCompareReturnOption);
+    return option?.symbol;
+  }
+
+  /** True when comparison is on (a second ETF has been selected). */
+  get isComparing(): boolean {
+    return this.selectedCompareReturnOption !== null;
+  }
+
+  /**
+   * Comparison is only meaningful with two real ETFs. Disabled when the primary
+   * is a custom rate (no real data) or a custom portfolio (multi-ETF vs ETF
+   * comparison is its own feature — keep this iteration scoped to ETF-vs-ETF).
+   */
+  get canCompare(): boolean {
+    return this.mode === 'whatif' && !this.isCustomReturn && !this.isCustomPortfolio;
+  }
+
+  /**
+   * Dropdown options for the comparison ETF. Excludes the primary selection
+   * (no point comparing SPY vs SPY) and the special "Custom Portfolio" /
+   * "Custom rate" entries (those don't yield real-data lines).
+   */
+  get compareReturnOptions(): IndexOption[] {
+    return this.returnOptions.filter(
+      o => o.value !== this.selectedReturnOption && o.value !== -1 && o.value !== -2
+    );
+  }
+
+  /** Toggle the comparison row on/off. Defaults the picker to a sensible peer. */
+  toggleCompare(): void {
+    if (this.isComparing) {
+      this.selectedCompareReturnOption = null;
+      return;
+    }
+    const firstOther = this.compareReturnOptions[0];
+    if (firstOther) {
+      this.selectedCompareReturnOption = Number(firstOther.value);
+    }
+  }
+
+  /** Handle comparison ETF selection. */
+  onCompareReturnOptionChange(value: number): void {
+    this.selectedCompareReturnOption = value;
+  }
+
+  /** Switch between simulation modes. Comparison only lives in What If. */
   setMode(mode: 'years' | 'target' | 'whatif'): void {
     this.mode = mode;
+    if (mode !== 'whatif') {
+      this.selectedCompareReturnOption = null;
+    }
   }
 
   /** Handle growth option selection from dropdown. */
@@ -193,11 +258,22 @@ export class SimulationFormComponent {
     }
   }
 
-  /** Handle return option selection from dropdown. */
+  /**
+   * Handle return option selection. Switching to Custom Portfolio or Custom
+   * Rate clears the comparison row (those modes can't be compared in the MVP).
+   * Picking the same symbol that was the comparison clears comparison too.
+   */
   onReturnOptionChange(value: number): void {
     this.selectedReturnOption = value;
     if (value === -1) {
       this.form.patchValue({ annualReturnRate: 7 });
+    }
+    if (value === -1 || value === -2) {
+      this.selectedCompareReturnOption = null;
+      return;
+    }
+    if (this.selectedCompareReturnOption === value) {
+      this.selectedCompareReturnOption = null;
     }
   }
 
@@ -318,6 +394,9 @@ export class SimulationFormComponent {
     } else if (this.mode === 'whatif') {
       data.startYear = this.selectedHistoricalYear;
       data.startMonth = this.selectedHistoricalMonth;
+      if (this.canCompare && this.selectedCompareIndexSymbol) {
+        data.compareIndexSymbol = this.selectedCompareIndexSymbol;
+      }
     }
 
     this.simulate.emit(data);
@@ -385,14 +464,18 @@ export class SimulationFormComponent {
 
   /**
    * Symbols that should constrain the historical picker right now: the
-   * portfolio members in custom-portfolio mode, the single ETF otherwise.
-   * Returns empty when neither is set (e.g. "Custom rate" — which whatif mode
-   * already disallows submission for).
+   * portfolio members in custom-portfolio mode; the primary ETF (plus the
+   * comparison ETF when comparison is on) otherwise. The picker uses the
+   * latest start date among these so neither simulation will fail backend
+   * coverage validation.
    */
   private activeHistoricalSymbols(): string[] {
     if (this.isCustomPortfolio) {
       return this.portfolioAllocations.filter(a => a.weight > 0).map(a => a.symbol);
     }
-    return this.selectedIndexSymbol ? [this.selectedIndexSymbol] : [];
+    const symbols: string[] = [];
+    if (this.selectedIndexSymbol) symbols.push(this.selectedIndexSymbol);
+    if (this.selectedCompareIndexSymbol) symbols.push(this.selectedCompareIndexSymbol);
+    return symbols;
   }
 }

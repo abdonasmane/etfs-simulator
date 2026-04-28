@@ -1,9 +1,17 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { trigger, transition, style, animate, query } from '@angular/animations';
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 import { ApiService } from '../../../../core/services';
-import { SimulateSummary, MonthProjection } from '../../../../core/models';
+import {
+  ComparisonResult,
+  ComparisonSide,
+  MonthProjection,
+  SimulateHistoricalResponse,
+  SimulateSummary,
+} from '../../../../core/models';
 import {
   SimulationFormComponent,
   SimulationFormData,
@@ -18,16 +26,25 @@ import { ThemeToggleComponent } from '../../../../shared/components/theme-toggle
 @Component({
   selector: 'app-simulation-page',
   standalone: true,
-  imports: [CommonModule, SimulationFormComponent, SimulationResultsComponent, ThemeToggleComponent],
+  imports: [
+    CommonModule,
+    SimulationFormComponent,
+    SimulationResultsComponent,
+    ThemeToggleComponent,
+  ],
   templateUrl: './simulation-page.component.html',
   styleUrl: './simulation-page.component.scss',
   animations: [
     trigger('resultChange', [
       transition('* => *', [
-        query('.results-content', [
-          style({ opacity: 0.5, transform: 'scale(0.98)' }),
-          animate('300ms ease-out', style({ opacity: 1, transform: 'scale(1)' })),
-        ], { optional: true }),
+        query(
+          '.results-content',
+          [
+            style({ opacity: 0.5, transform: 'scale(0.98)' }),
+            animate('300ms ease-out', style({ opacity: 1, transform: 'scale(1)' })),
+          ],
+          { optional: true }
+        ),
       ]),
     ]),
   ],
@@ -40,6 +57,13 @@ export class SimulationPageComponent {
   readonly error = signal<string | null>(null);
   readonly summary = signal<SimulateSummary | null>(null);
   readonly projections = signal<MonthProjection[]>([]);
+
+  /**
+   * Side-by-side ETF-vs-ETF comparison result, set only when the user enabled
+   * comparison in What If mode. When non-null, results render in compare layout
+   * and `summary`/`projections` mirror the primary side for legacy display.
+   */
+  readonly comparison = signal<ComparisonResult | null>(null);
 
   /** Key that changes on each update to trigger animation */
   readonly resultKey = signal(0);
@@ -93,6 +117,10 @@ export class SimulationPageComponent {
           },
         });
     } else if (data.mode === 'whatif' && data.startYear && data.startMonth) {
+      if (data.compareIndexSymbol && data.indexSymbol) {
+        this.runComparison(data, data.indexSymbol, data.compareIndexSymbol);
+        return;
+      }
       this.apiService
         .simulateHistorical({
           initialInvestment: data.initialInvestment,
@@ -105,24 +133,7 @@ export class SimulationPageComponent {
         })
         .subscribe({
           next: response => {
-            // Map HistoricalSimulateSummary → SimulateSummary shape
-            const historicalSummary: SimulateSummary = {
-              targetDate: response.summary.endDate,
-              finalValue: response.summary.finalValue,
-              totalContributed: response.summary.totalContributed,
-              totalGain: response.summary.totalGain,
-              percentageGain: response.summary.percentageGain,
-              totalMonths: response.summary.totalMonths,
-              finalMonthlyContribution: response.summary.finalMonthlyContribution,
-              contributionMilestones: response.summary.contributionMilestones,
-              hasRange: false,
-              portfolio: response.summary.portfolio,
-              // Historical-specific fields
-              isHistorical: true,
-              historicalStartDate: response.summary.startDate,
-              annualizedReturn: response.summary.annualizedReturn,
-            };
-            this.updateResults(historicalSummary, response.projections);
+            this.updateResults(this.toHistoricalSummary(response), response.projections);
           },
           error: err => {
             this.error.set(err.message);
@@ -133,9 +144,101 @@ export class SimulationPageComponent {
   }
 
   /**
-   * Update results with animation trigger.
+   * Fire two parallel historical simulations for an ETF-vs-ETF comparison.
+   *
+   * `forkJoin` waits for both to settle before pushing one update — that
+   * keeps the chart from flicker-redrawing once per side. We swallow per-side
+   * errors into `ComparisonSide.error` so a single broken ETF doesn't blank
+   * the page; the surviving side still renders, marked accordingly. Only when
+   * BOTH sides fail do we surface a top-level error.
+   */
+  private runComparison(
+    data: SimulationFormData,
+    primarySymbol: string,
+    secondarySymbol: string
+  ): void {
+    const buildRequest = (symbol: string): Parameters<ApiService['simulateHistorical']>[0] => ({
+      initialInvestment: data.initialInvestment,
+      monthlyContribution: data.monthlyContribution,
+      startYear: data.startYear!,
+      startMonth: data.startMonth!,
+      indexSymbol: symbol,
+      contributionGrowthRate: data.contributionGrowthRate,
+    });
+
+    const sideOf = (symbol: string): Observable<ComparisonSide> =>
+      this.apiService.simulateHistorical(buildRequest(symbol)).pipe(
+        map(
+          (response): ComparisonSide => ({
+            symbol,
+            name: symbol,
+            summary: this.toHistoricalSummary(response),
+            projections: response.projections,
+          })
+        ),
+        catchError((err: Error) =>
+          of<ComparisonSide>({
+            symbol,
+            name: symbol,
+            error: err.message,
+          })
+        )
+      );
+
+    forkJoin({
+      primary: sideOf(primarySymbol),
+      secondary: sideOf(secondarySymbol),
+    }).subscribe(result => {
+      if (!result.primary.summary && !result.secondary.summary) {
+        this.error.set(
+          `Couldn't fetch data for ${primarySymbol} or ${secondarySymbol}. ` +
+            (result.primary.error ?? result.secondary.error ?? 'Try a different start date.')
+        );
+        this.comparison.set(null);
+        this.loading.set(false);
+        return;
+      }
+      this.comparison.set(result);
+      // Mirror the primary side into legacy summary/projections so existing
+      // UI sections (table, milestones) keep working when only the primary
+      // succeeded; the comparison-aware view reads `comparison` directly.
+      const winning = result.primary.summary ? result.primary : result.secondary;
+      if (winning.summary && winning.projections) {
+        this.summary.set(winning.summary);
+        this.projections.set(winning.projections);
+      }
+      this.error.set(null);
+      this.resultKey.update(k => (k + 1) % 10000000);
+      this.loading.set(false);
+    });
+  }
+
+  /** Map a backend historical response into the unified `SimulateSummary`. */
+  private toHistoricalSummary(response: SimulateHistoricalResponse): SimulateSummary {
+    return {
+      targetDate: response.summary.endDate,
+      finalValue: response.summary.finalValue,
+      totalContributed: response.summary.totalContributed,
+      totalGain: response.summary.totalGain,
+      percentageGain: response.summary.percentageGain,
+      totalMonths: response.summary.totalMonths,
+      finalMonthlyContribution: response.summary.finalMonthlyContribution,
+      contributionMilestones: response.summary.contributionMilestones,
+      hasRange: false,
+      portfolio: response.summary.portfolio,
+      isHistorical: true,
+      historicalStartDate: response.summary.startDate,
+      annualizedReturn: response.summary.annualizedReturn,
+    };
+  }
+
+  /**
+   * Update results with animation trigger. Clears any previous comparison
+   * state so toggling compare off and re-running doesn't leave stale dual
+   * cards on screen.
    */
   private updateResults(summary: SimulateSummary, projections: MonthProjection[]): void {
+    this.comparison.set(null);
     this.summary.set(summary);
     this.projections.set(projections);
     this.resultKey.update(k => (k + 1) % 10000000);
