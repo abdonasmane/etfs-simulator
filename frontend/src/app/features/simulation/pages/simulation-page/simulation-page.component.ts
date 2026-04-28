@@ -85,6 +85,7 @@ export class SimulationPageComponent {
           indexSymbol: data.indexSymbol,
           annualReturnRate: data.annualReturnRate,
           contributionGrowthRate: data.contributionGrowthRate,
+          contributionGrowthAmount: data.contributionGrowthAmount,
         })
         .subscribe({
           next: response => {
@@ -106,6 +107,7 @@ export class SimulationPageComponent {
           indexSymbol: data.indexSymbol,
           annualReturnRate: data.annualReturnRate,
           contributionGrowthRate: data.contributionGrowthRate,
+          contributionGrowthAmount: data.contributionGrowthAmount,
         })
         .subscribe({
           next: response => {
@@ -130,6 +132,7 @@ export class SimulationPageComponent {
           portfolio: data.portfolio,
           indexSymbol: data.indexSymbol,
           contributionGrowthRate: data.contributionGrowthRate,
+          contributionGrowthAmount: data.contributionGrowthAmount,
         })
         .subscribe({
           next: response => {
@@ -164,6 +167,7 @@ export class SimulationPageComponent {
       startMonth: data.startMonth!,
       indexSymbol: symbol,
       contributionGrowthRate: data.contributionGrowthRate,
+      contributionGrowthAmount: data.contributionGrowthAmount,
     });
 
     const sideOf = (symbol: string): Observable<ComparisonSide> =>

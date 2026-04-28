@@ -34,7 +34,13 @@ type SimulateHistoricalRequest struct {
 	IndexSymbol *string `json:"indexSymbol,omitempty" example:"SPY"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
+	// Mutually exclusive with ContributionGrowthAmount.
 	ContributionGrowthRate *float64 `json:"contributionGrowthRate,omitempty" example:"3.0"`
+
+	// ContributionGrowthAmount is a fixed annual euro increase to the monthly contribution
+	// (e.g., 600 means "add €600/year split evenly = €50/month each month"). Mutually
+	// exclusive with ContributionGrowthRate.
+	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"600"`
 }
 
 // HistoricalSimulateSummary contains the actual results of a historical simulation.
@@ -106,14 +112,16 @@ func (h *Handler) handleSimulateHistorical(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Apply defaults
-	contributionGrowth := applyDefault(req.ContributionGrowthRate, 0.0)
-	req.ContributionGrowthRate = &contributionGrowth
-
-	if contributionGrowth < 0 || contributionGrowth > 20 {
-		respondError(w, http.StatusBadRequest, "contributionGrowthRate must be between 0 and 20")
+	// Apply defaults — either rate or fixed-amount growth, not both.
+	contributionGrowth, contributionGrowthAmount, growthErr := resolveContributionGrowth(
+		req.ContributionGrowthRate, req.ContributionGrowthAmount,
+	)
+	if errors.Check(growthErr) {
+		respondError(w, http.StatusBadRequest, growthErr.Error())
 		return
 	}
+	req.ContributionGrowthRate = &contributionGrowth
+	req.ContributionGrowthAmount = &contributionGrowthAmount
 
 	// Resolve symbols and weights from portfolio or single index
 	symbols, weights, portfolioBreakdown, err := h.resolveHistoricalAllocations(req)
@@ -164,6 +172,7 @@ func (h *Handler) handleSimulateHistorical(w http.ResponseWriter, r *http.Reques
 		weights,
 		pricesBySymbol,
 		contributionGrowth,
+		contributionGrowthAmount,
 	)
 	if errors.Check(simErr) {
 		respondError(w, http.StatusBadRequest, simErr.Error())
@@ -282,9 +291,10 @@ func runHistoricalSimulation(
 	symbols []string,
 	weights []float64,
 	pricesBySymbol map[string]map[string]float64,
-	contributionGrowth float64,
+	contributionGrowth, contributionGrowthAmount float64,
 ) ([]MonthProjection, HistoricalSimulateSummary, error) {
 	monthlyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/12.0) - 1
+	monthlyContributionAmount := contributionGrowthAmount / 12.0
 
 	// Establish a baseline price for every symbol from the months immediately
 	// preceding startDate. Walks back up to 12 months to absorb a leading
@@ -335,7 +345,7 @@ func runHistoricalSimulation(
 			PortfolioValue:      round2(balance),
 		})
 
-		currentContribution *= (1 + monthlyContributionGrowth)
+		currentContribution = currentContribution*(1+monthlyContributionGrowth) + monthlyContributionAmount
 	}
 
 	if len(projections) == 0 {

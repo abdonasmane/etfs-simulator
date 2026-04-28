@@ -25,7 +25,10 @@ import { IndexInfo } from '../../../../core/models';
 export interface SimulationFormData {
   initialInvestment: number;
   monthlyContribution: number;
+  /** Annual % increase in monthly contribution. 0 when user picked the fixed-amount mode. */
   contributionGrowthRate: number;
+  /** Fixed annual € increase added to monthly contribution. 0 when user picked the percentage mode. */
+  contributionGrowthAmount: number;
   mode: 'years' | 'target' | 'whatif';
   years?: number;
   targetYear?: number;
@@ -80,12 +83,18 @@ export class SimulationFormComponent {
   currentYear = new Date().getFullYear();
   currentMonth = new Date().getMonth() + 1; // 1-12
 
-  /** Options for contribution growth rate dropdown */
+  /**
+   * Options for the contribution-growth dropdown. Sentinel values:
+   *   -1 → custom percentage (user types a % rate)
+   *   -2 → custom fixed €/year (user types an annual euro amount)
+   * Positive values are the percent literal (0, 2.5, 4) for one-click presets.
+   */
   growthOptions: SelectOption[] = [
     { label: 'None — fixed contribution', value: 0 },
     { label: '+2.5%/year (typical inflation)', value: 2.5 },
     { label: '+4%/year (typical salary growth)', value: 4 },
-    { label: 'Custom...', value: -1 },
+    { label: 'Custom % per year...', value: -1 },
+    { label: 'Custom +€/year (fixed amount)...', value: -2 },
   ];
 
   /** Options for expected annual return based on historical index performance */
@@ -125,7 +134,7 @@ export class SimulationFormComponent {
     { value: 12, label: 'December' },
   ];
 
-  /** Selected growth option value (-1 means custom) */
+  /** Selected growth option value (-1 = custom %, -2 = custom € amount, else literal preset). */
   selectedGrowthOption = 0;
 
   /** Selected return option value (-1 means custom, positive values are index IDs) */
@@ -169,6 +178,10 @@ export class SimulationFormComponent {
       monthlyContribution: [500, [Validators.required, Validators.min(0)]],
       annualReturnRate: [7, [Validators.required, Validators.min(0), Validators.max(100)]],
       contributionGrowthRate: [0, [Validators.required, Validators.min(0), Validators.max(20)]],
+      contributionGrowthAmount: [
+        600,
+        [Validators.required, Validators.min(0), Validators.max(10000)],
+      ],
       years: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetYearsFromNow: [10, [Validators.required, Validators.min(1), Validators.max(49)]],
       targetMonth: [12, [Validators.required, Validators.min(1), Validators.max(12)]],
@@ -250,11 +263,23 @@ export class SimulationFormComponent {
     }
   }
 
-  /** Handle growth option selection from dropdown. */
+  /**
+   * Handle growth option selection. Presets (>=0) populate the % field
+   * directly. Sentinels surface a custom-input row: -1 for percentage, -2 for
+   * a fixed €/year amount. We seed sensible defaults so the input doesn't
+   * appear empty when the user first reveals it.
+   */
   onGrowthOptionChange(value: number): void {
     this.selectedGrowthOption = value;
     if (value >= 0) {
       this.form.patchValue({ contributionGrowthRate: value });
+      return;
+    }
+    if (value === -1) {
+      // Custom %, default to a low non-zero value so the input has visible content.
+      this.form.patchValue({ contributionGrowthRate: 3 });
+    } else if (value === -2) {
+      this.form.patchValue({ contributionGrowthAmount: 600 });
     }
   }
 
@@ -277,9 +302,24 @@ export class SimulationFormComponent {
     }
   }
 
-  /** Check if custom growth rate input should be shown. */
+  /** Check if custom growth-percentage input should be shown. */
   get isCustomGrowth(): boolean {
     return this.selectedGrowthOption === -1;
+  }
+
+  /** Check if the fixed-amount €/year input should be shown. */
+  get isCustomGrowthAmount(): boolean {
+    return this.selectedGrowthOption === -2;
+  }
+
+  /**
+   * Human-readable monthly equivalent of the fixed-amount growth, used in the
+   * helper text. Rounds to the nearest euro since the bump is split evenly
+   * across 12 months in the backend.
+   */
+  get growthAmountPerMonth(): number {
+    const annual = Number(this.form.value.contributionGrowthAmount) || 0;
+    return Math.round(annual / 12);
   }
 
   /** Check if custom return rate input should be shown. */
@@ -370,10 +410,17 @@ export class SimulationFormComponent {
     if (this.mode === 'whatif' && !this.isHistoricalDateValid) return;
 
     const formValue = this.form.value;
+    // Only one growth dimension is meaningful per submission (the backend
+    // rejects requests where both are non-zero). We zero out whichever the
+    // user didn't pick — that way the request stays unambiguous regardless of
+    // stale form state from previous selections.
+    const growthRate = this.isCustomGrowthAmount ? 0 : formValue.contributionGrowthRate;
+    const growthAmount = this.isCustomGrowthAmount ? formValue.contributionGrowthAmount : 0;
     const data: SimulationFormData = {
       initialInvestment: formValue.initialInvestment,
       monthlyContribution: formValue.monthlyContribution,
-      contributionGrowthRate: formValue.contributionGrowthRate,
+      contributionGrowthRate: growthRate,
+      contributionGrowthAmount: growthAmount,
       mode: this.mode,
     };
 

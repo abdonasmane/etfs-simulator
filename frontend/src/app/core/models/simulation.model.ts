@@ -58,8 +58,11 @@ export interface SimulateByYearsRequest {
   /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol or portfolio is provided. */
   annualReturnRate?: number;
 
-  /** Annual percentage increase in contributions (default: 0) */
+  /** Annual percentage increase in contributions (default: 0). Mutually exclusive with contributionGrowthAmount. */
   contributionGrowthRate?: number;
+
+  /** Fixed annual euro increase to monthly contribution (default: 0). Mutually exclusive with contributionGrowthRate. */
+  contributionGrowthAmount?: number;
 }
 
 /**
@@ -88,8 +91,11 @@ export interface SimulateByTargetRequest {
   /** Expected annual return percentage (default: 7.0). Ignored if indexSymbol or portfolio is provided. */
   annualReturnRate?: number;
 
-  /** Annual percentage increase in contributions (default: 0) */
+  /** Annual percentage increase in contributions (default: 0). Mutually exclusive with contributionGrowthAmount. */
   contributionGrowthRate?: number;
+
+  /** Fixed annual euro increase to monthly contribution (default: 0). Mutually exclusive with contributionGrowthRate. */
+  contributionGrowthAmount?: number;
 }
 
 // --- Response Types ---
@@ -244,8 +250,11 @@ export interface SimulateHistoricalRequest {
   /** Index symbol (e.g., "SPY"). Used when portfolio is not provided. */
   indexSymbol?: string;
 
-  /** Annual percentage increase in contributions (default: 0) */
+  /** Annual percentage increase in contributions (default: 0). Mutually exclusive with contributionGrowthAmount. */
   contributionGrowthRate?: number;
+
+  /** Fixed annual euro increase to monthly contribution (default: 0). Mutually exclusive with contributionGrowthRate. */
+  contributionGrowthAmount?: number;
 }
 
 /**

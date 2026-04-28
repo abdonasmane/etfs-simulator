@@ -43,7 +43,13 @@ type SimulateByYearsRequest struct {
 	AnnualReturnRate *float64 `json:"annualReturnRate,omitempty" example:"7.0"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
+	// Mutually exclusive with ContributionGrowthAmount.
 	ContributionGrowthRate *float64 `json:"contributionGrowthRate,omitempty" example:"3.0"`
+
+	// ContributionGrowthAmount is a fixed annual euro increase to the monthly contribution
+	// (e.g., 600 means "add €600/year split evenly = €50/month each month"). Mutually
+	// exclusive with ContributionGrowthRate.
+	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"600"`
 }
 
 // SimulateByTargetRequest is the input for simulating until a target date.
@@ -71,7 +77,13 @@ type SimulateByTargetRequest struct {
 	AnnualReturnRate *float64 `json:"annualReturnRate,omitempty" example:"7.0"`
 
 	// ContributionGrowthRate is the annual percentage increase in contributions (default: 0).
+	// Mutually exclusive with ContributionGrowthAmount.
 	ContributionGrowthRate *float64 `json:"contributionGrowthRate,omitempty" example:"3.0"`
+
+	// ContributionGrowthAmount is a fixed annual euro increase to the monthly contribution
+	// (e.g., 600 means "add €600/year split evenly = €50/month each month"). Mutually
+	// exclusive with ContributionGrowthRate.
+	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"600"`
 }
 
 // --- Response Types ---
@@ -216,16 +228,16 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 	} else {
 		annualRate = applyDefault(req.AnnualReturnRate, 7.0)
 	}
-	contributionGrowth := applyDefault(req.ContributionGrowthRate, 0.0)
-
-	req.AnnualReturnRate = &annualRate
-	req.ContributionGrowthRate = &contributionGrowth
-
-	// Validate rates
-	if contributionGrowth < 0 || contributionGrowth > 20 {
-		respondError(w, http.StatusBadRequest, "contributionGrowthRate must be between 0 and 20")
+	contributionGrowth, contributionGrowthAmount, growthErr := resolveContributionGrowth(
+		req.ContributionGrowthRate, req.ContributionGrowthAmount,
+	)
+	if errors.Check(growthErr) {
+		respondError(w, http.StatusBadRequest, growthErr.Error())
 		return
 	}
+	req.AnnualReturnRate = &annualRate
+	req.ContributionGrowthRate = &contributionGrowth
+	req.ContributionGrowthAmount = &contributionGrowthAmount
 
 	// Calculate dates
 	now := time.Now()
@@ -248,7 +260,7 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 			startYear, startMonth,
 			totalMonths,
 			indexInfo,
-			contributionGrowth,
+			contributionGrowth, contributionGrowthAmount,
 			endYear, endMonth,
 		)
 		// Add portfolio info if applicable
@@ -264,7 +276,7 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 			startYear, startMonth,
 			totalMonths,
 			annualRate,
-			contributionGrowth,
+			contributionGrowth, contributionGrowthAmount,
 		)
 		summary = buildSummary(projections, totalMonths, endYear, endMonth, startYear)
 	}
@@ -274,6 +286,7 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 		slog.Float64("monthly", req.MonthlyContribution),
 		slog.Int("years", req.Years),
 		slog.Float64("contribution_growth", contributionGrowth),
+		slog.Float64("contribution_growth_amount", contributionGrowthAmount),
 		slog.Float64("final_value", summary.FinalValue),
 		slog.Bool("has_range", summary.HasRange),
 	)
@@ -383,16 +396,16 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 	} else {
 		annualRate = applyDefault(req.AnnualReturnRate, 7.0)
 	}
-	contributionGrowth := applyDefault(req.ContributionGrowthRate, 0.0)
-
-	req.AnnualReturnRate = &annualRate
-	req.ContributionGrowthRate = &contributionGrowth
-
-	// Validate rates
-	if contributionGrowth < 0 || contributionGrowth > 20 {
-		respondError(w, http.StatusBadRequest, "contributionGrowthRate must be between 0 and 20")
+	contributionGrowth, contributionGrowthAmount, growthErr := resolveContributionGrowth(
+		req.ContributionGrowthRate, req.ContributionGrowthAmount,
+	)
+	if errors.Check(growthErr) {
+		respondError(w, http.StatusBadRequest, growthErr.Error())
 		return
 	}
+	req.AnnualReturnRate = &annualRate
+	req.ContributionGrowthRate = &contributionGrowth
+	req.ContributionGrowthAmount = &contributionGrowthAmount
 
 	// Run simulation(s)
 	var projections []MonthProjection
@@ -406,7 +419,7 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 			startYear, startMonth,
 			totalMonths,
 			indexInfo,
-			contributionGrowth,
+			contributionGrowth, contributionGrowthAmount,
 			req.TargetYear, endMonth,
 		)
 		// Add portfolio info if applicable
@@ -422,7 +435,7 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 			startYear, startMonth,
 			totalMonths,
 			annualRate,
-			contributionGrowth,
+			contributionGrowth, contributionGrowthAmount,
 		)
 		summary = buildSummary(projections, totalMonths, req.TargetYear, endMonth, startYear)
 	}
@@ -432,6 +445,7 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 		slog.Float64("monthly", req.MonthlyContribution),
 		slog.String("target", summary.TargetDate),
 		slog.Float64("contribution_growth", contributionGrowth),
+		slog.Float64("contribution_growth_amount", contributionGrowthAmount),
 		slog.Float64("final_value", summary.FinalValue),
 		slog.Bool("has_range", summary.HasRange),
 	)
@@ -453,15 +467,42 @@ func applyDefault(ptr *float64, defaultVal float64) float64 {
 	return defaultVal
 }
 
+// resolveContributionGrowth normalizes the two contribution-growth inputs.
+// Callers may supply at most one of them — supplying both is rejected so
+// requests are unambiguous (the underlying simulator can apply both, but the
+// UI/UX contract is "pick one mode"). Returns rate, amount, and a validation
+// error if anything is out of bounds.
+func resolveContributionGrowth(rate, amount *float64) (float64, float64, error) {
+	r := applyDefault(rate, 0.0)
+	a := applyDefault(amount, 0.0)
+	if rate != nil && amount != nil && *rate > 0 && *amount > 0 {
+		return 0, 0, errors.New(
+			"specify either contributionGrowthRate or contributionGrowthAmount, not both",
+		)
+	}
+	if r < 0 || r > 20 {
+		return 0, 0, errors.New("contributionGrowthRate must be between 0 and 20")
+	}
+	if a < 0 || a > 10000 {
+		return 0, 0, errors.New("contributionGrowthAmount must be between 0 and 10000")
+	}
+	return r, a, nil
+}
+
 // simulateMonthly calculates month-by-month portfolio growth with growing contributions.
+//
+// Two contribution-growth modes can be applied (and combined, though the
+// handlers reject requests that set both): contributionGrowth is an annual
+// percentage compounded monthly, contributionGrowthAmount is a flat annual
+// euro increase distributed evenly across months. Both default to 0.
 func simulateMonthly(
 	initial, monthlyBase float64,
 	startYear, startMonth, totalMonths int,
-	annualRate, contributionGrowth float64,
+	annualRate, contributionGrowth, contributionGrowthAmount float64,
 ) []MonthProjection {
-	// Convert annual rates to monthly factors
 	monthlyReturnRate := math.Pow(1+annualRate/100, 1.0/12.0) - 1
 	monthlyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/12.0) - 1
+	monthlyContributionAmount := contributionGrowthAmount / 12.0
 
 	projections := make([]MonthProjection, 0, totalMonths)
 	balance := initial
@@ -472,17 +513,14 @@ func simulateMonthly(
 	currentMonth := startMonth
 
 	for i := 0; i < totalMonths; i++ {
-		// Advance to next month
 		currentMonth++
 		if currentMonth > 12 {
 			currentMonth = 1
 			currentYear++
 		}
 
-		// Apply investment return
 		balance *= (1 + monthlyReturnRate)
 
-		// Add contribution (grows each month)
 		balance += currentContribution
 		totalContributed += currentContribution
 
@@ -494,8 +532,11 @@ func simulateMonthly(
 			PortfolioValue:      round2(balance),
 		})
 
-		// Grow contribution for next month
-		currentContribution *= (1 + monthlyContributionGrowth)
+		// Grow contribution for next month: percentage first, then flat amount.
+		// Order doesn't matter when one of them is 0 (the common case); when
+		// both are non-zero this matches "compound the percent on this month's
+		// base, then add the flat increment" — straightforward semantics.
+		currentContribution = currentContribution*(1+monthlyContributionGrowth) + monthlyContributionAmount
 	}
 
 	return projections
@@ -651,13 +692,12 @@ func simulateWithRange(
 	initial, monthlyBase float64,
 	startYear, startMonth, totalMonths int,
 	rates *indexReturnRates,
-	contributionGrowth float64,
+	contributionGrowth, contributionGrowthAmount float64,
 	endYear, endMonth int,
 ) ([]MonthProjection, SimulateSummary) {
-	// Run all three simulations
-	medianProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.median, contributionGrowth)
-	pessimisticProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.pessimistic, contributionGrowth)
-	optimisticProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.optimistic, contributionGrowth)
+	medianProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.median, contributionGrowth, contributionGrowthAmount)
+	pessimisticProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.pessimistic, contributionGrowth, contributionGrowthAmount)
+	optimisticProj := simulateMonthly(initial, monthlyBase, startYear, startMonth, totalMonths, rates.optimistic, contributionGrowth, contributionGrowthAmount)
 
 	// Merge into single projection list with range values
 	projections := make([]MonthProjection, len(medianProj))
