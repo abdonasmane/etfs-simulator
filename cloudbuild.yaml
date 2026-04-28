@@ -1,0 +1,69 @@
+steps:
+  # ── Build backend & frontend in parallel ──
+  - id: build-backend
+    name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['-']
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/backend:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/backend:latest'
+      - '-f'
+      - 'backend/Dockerfile'
+      - 'backend'
+
+  - id: build-frontend
+    name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['-']
+    args:
+      - 'build'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/frontend:$COMMIT_SHA'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/frontend:latest'
+      - '-f'
+      - 'frontend/Dockerfile'
+      - 'frontend'
+
+  # ── Push both images ──
+  - id: push-backend
+    name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['build-backend']
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/backend']
+
+  - id: push-frontend
+    name: 'gcr.io/cloud-builders/docker'
+    waitFor: ['build-frontend']
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/frontend']
+
+  # ── Deploy both Cloud Run services ──
+  - id: deploy-backend
+    name: 'gcr.io/cloud-builders/gcloud'
+    waitFor: ['push-backend']
+    args:
+      - 'run'
+      - 'deploy'
+      - 'etfs-simulator-backend'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/backend:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+
+  - id: deploy-frontend
+    name: 'gcr.io/cloud-builders/gcloud'
+    waitFor: ['push-frontend']
+    args:
+      - 'run'
+      - 'deploy'
+      - 'etfs-simulator-frontend'
+      - '--image=${_REGION}-docker.pkg.dev/$PROJECT_ID/etfs-simulator/frontend:$COMMIT_SHA'
+      - '--region=${_REGION}'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+
+substitutions:
+  _REGION: us-west1
+
+options:
+  logging: CLOUD_LOGGING_ONLY
