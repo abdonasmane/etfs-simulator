@@ -1,4 +1,12 @@
-import { Component, Input, Output, EventEmitter, HostListener, ElementRef, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  HostListener,
+  ElementRef,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { trigger, transition, style, animate } from '@angular/animations';
 
@@ -41,7 +49,14 @@ export interface SelectOption {
       >
         <span class="selected-label">{{ selectedLabel }}</span>
         <span class="arrow">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+          >
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </span>
@@ -71,123 +86,124 @@ export interface SelectOption {
       }
     </div>
   `,
-  styles: [`
-    .custom-select {
-      position: relative;
-      width: 100%;
-    }
-
-    .select-trigger {
-      width: 100%;
-      padding: 0.875rem 1rem;
-      padding-right: 2.5rem;
-      border: 2px solid var(--color-border);
-      border-radius: 10px;
-      background: var(--color-bg-secondary);
-      font-size: 1rem;
-      color: var(--color-text-primary);
-      text-align: left;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-
-      &:hover {
-        border-color: var(--color-text-muted);
+  styles: [
+    `
+      .custom-select {
+        position: relative;
+        width: 100%;
       }
 
-      &:focus {
-        outline: none;
+      .select-trigger {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        padding-right: 2rem;
+        border: 1px solid var(--color-border);
+        border-radius: 6px;
+        background: var(--color-bg-secondary);
+        font-size: 0.875rem;
+        color: var(--color-text-primary);
+        text-align: left;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        letter-spacing: -0.005em;
+
+        &:hover {
+          border-color: var(--color-border-strong);
+        }
+
+        &:focus {
+          outline: none;
+          border-color: var(--color-accent);
+          box-shadow: 0 0 0 3px var(--color-accent-light);
+        }
+      }
+
+      .custom-select.open .select-trigger {
         border-color: var(--color-accent);
         box-shadow: 0 0 0 3px var(--color-accent-light);
       }
-    }
 
-    .custom-select.open .select-trigger {
-      border-color: var(--color-accent);
-      box-shadow: 0 0 0 3px var(--color-accent-light);
-    }
-
-    .selected-label {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .arrow {
-      display: flex;
-      align-items: center;
-      color: var(--color-text-secondary);
-      transition: transform 0.2s ease;
-    }
-
-    .custom-select.open .arrow {
-      transform: rotate(180deg);
-    }
-
-    .dropdown {
-      position: absolute;
-      top: calc(100% + 4px);
-      left: 0;
-      right: 0;
-      background: var(--color-bg-secondary);
-      border: 2px solid var(--color-border);
-      border-radius: 10px;
-      box-shadow: 0 10px 40px var(--color-card-shadow-hover);
-      z-index: 100;
-      max-height: 280px;
-      overflow-y: auto;
-    }
-
-    .option {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: none;
-      background: transparent;
-      font-size: 0.95rem;
-      color: var(--color-text-primary);
-      text-align: left;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: background 0.1s ease;
-
-      &:first-child {
-        border-radius: 8px 8px 0 0;
+      .selected-label {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      &:last-child {
-        border-radius: 0 0 8px 8px;
+      .arrow {
+        display: flex;
+        align-items: center;
+        color: var(--color-text-muted);
+        transition: transform 0.2s ease;
       }
 
-      &:hover {
-        background: var(--color-bg-tertiary);
-      }
-
-      &.selected {
-        background: var(--color-accent-light);
+      .custom-select.open .arrow {
+        transform: rotate(180deg);
         color: var(--color-accent);
-        font-weight: 600;
       }
-    }
 
-    .option-label {
-      flex: 1;
-    }
+      .dropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        background: var(--color-bg-secondary);
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        box-shadow: var(--shadow-lg);
+        z-index: 100;
+        max-height: 280px;
+        overflow-y: auto;
+        padding: 4px;
+      }
 
-    .option-hint {
-      font-size: 0.8rem;
-      color: var(--color-text-muted);
-    }
+      .option {
+        width: 100%;
+        padding: 0.5rem 0.625rem;
+        border: none;
+        background: transparent;
+        font-size: 0.8125rem;
+        color: var(--color-text-primary);
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: background 0.1s ease;
+        border-radius: 4px;
+        letter-spacing: -0.005em;
 
-    .check {
-      color: var(--color-accent);
-      font-weight: 700;
-    }
-  `]
+        &:hover {
+          background: var(--color-bg-tertiary);
+        }
+
+        &.selected {
+          background: var(--color-accent-light);
+          color: var(--color-accent);
+          font-weight: 600;
+        }
+      }
+
+      .option-label {
+        flex: 1;
+      }
+
+      .option-hint {
+        font-size: 0.75rem;
+        color: var(--color-text-muted);
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .check {
+        color: var(--color-accent);
+        font-weight: 700;
+      }
+    `,
+  ],
 })
 export class CustomSelectComponent {
   @Input() options: SelectOption[] = [];

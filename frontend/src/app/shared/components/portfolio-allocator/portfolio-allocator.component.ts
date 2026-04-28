@@ -24,14 +24,14 @@ export interface AllocationOutput {
  * Available ETFs for portfolio allocation.
  */
 export const AVAILABLE_ETFS: PortfolioETF[] = [
-  { symbol: 'SPY',     name: 'S&P 500',           hint: '~8.7% median',  color: '#4361ee' },
-  { symbol: 'QQQ',     name: 'NASDAQ 100',         hint: '~13.6% median', color: '#7c3aed' },
-  { symbol: 'EFA',     name: 'MSCI EAFE',          hint: '~5.7% median',  color: '#0891b2' },
-  { symbol: 'VTI',     name: 'US Total Market',    hint: 'Vanguard',      color: '#059669' },
-  { symbol: 'IEMG',    name: 'Emerging Markets',   hint: 'iShares',       color: '#dc2626' },
-  { symbol: 'VWCE.DE', name: 'FTSE All-World',     hint: 'UCITS',         color: '#6366f1' },
-  { symbol: 'ISDU.L',  name: 'MSCI USA Islamic',   hint: 'Shariah',       color: '#0d9488' },
-  { symbol: 'IGDA.L',  name: 'Global Dev. Islamic',hint: 'Shariah',       color: '#b45309' },
+  { symbol: 'SPY', name: 'S&P 500', hint: '~8.7% median', color: '#4361ee' },
+  { symbol: 'QQQ', name: 'NASDAQ 100', hint: '~13.6% median', color: '#7c3aed' },
+  { symbol: 'EFA', name: 'MSCI EAFE', hint: '~5.7% median', color: '#0891b2' },
+  { symbol: 'VTI', name: 'US Total Market', hint: 'Vanguard', color: '#059669' },
+  { symbol: 'IEMG', name: 'Emerging Markets', hint: 'iShares', color: '#dc2626' },
+  { symbol: 'VWCE.DE', name: 'FTSE All-World', hint: 'UCITS', color: '#6366f1' },
+  { symbol: 'ISDU.L', name: 'MSCI USA Islamic', hint: 'Shariah', color: '#0d9488' },
+  { symbol: 'IGDA.L', name: 'Global Dev. Islamic', hint: 'Shariah', color: '#b45309' },
 ];
 
 /**
@@ -101,9 +101,7 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
       </div>
 
       <div class="quick-presets">
-        <button type="button" class="preset-btn" (click)="applyPreset('balanced')">
-          Balanced
-        </button>
+        <button type="button" class="preset-btn" (click)="applyPreset('balanced')">Balanced</button>
         <button type="button" class="preset-btn" (click)="applyPreset('aggressive')">
           Aggressive
         </button>
@@ -117,8 +115,9 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
     `
       .portfolio-allocator {
         background: var(--color-bg-tertiary);
-        border-radius: 12px;
-        padding: 1rem;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 0.875rem;
         margin-top: 0.5rem;
       }
 
@@ -126,124 +125,127 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 1rem;
+        margin-bottom: 0.875rem;
       }
 
       .portfolio-title {
         font-weight: 600;
-        font-size: 0.875rem;
+        font-size: 0.75rem;
         color: var(--color-text-primary);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
       }
 
       .portfolio-total {
-        font-weight: 700;
-        font-size: 0.875rem;
-        padding: 0.25rem 0.5rem;
-        border-radius: 6px;
-        transition: all 0.2s ease;
+        font-weight: 600;
+        font-size: 0.8125rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        transition: all 0.15s ease;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
 
         &.valid {
-          background: rgba(34, 197, 94, 0.2);
-          color: #4ade80;
+          background: var(--color-success-light);
+          color: var(--color-success);
         }
 
         &.invalid {
-          background: rgba(239, 68, 68, 0.2);
-          color: #f87171;
+          background: var(--color-error-light);
+          color: var(--color-error);
         }
       }
 
       .allocations {
         display: flex;
         flex-direction: column;
-        gap: 0.875rem;
+        gap: 0.75rem;
       }
 
       .allocation-row {
         display: flex;
         flex-direction: column;
-        gap: 0.375rem;
+        gap: 0.3rem;
       }
 
       .etf-info {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        gap: 0.45rem;
       }
 
       .etf-color {
-        width: 10px;
-        height: 10px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
         flex-shrink: 0;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
       }
 
       .etf-name {
         font-weight: 600;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         color: var(--color-text-primary);
       }
 
       .etf-hint {
-        font-size: 0.7rem;
+        font-size: 0.6875rem;
         color: var(--color-text-muted);
       }
 
       .allocation-control {
         display: flex;
         align-items: center;
-        gap: 0.75rem;
+        gap: 0.625rem;
       }
 
       .allocation-slider {
         flex: 1;
-        height: 6px;
+        height: 4px;
         -webkit-appearance: none;
         appearance: none;
-        background: rgba(148, 163, 184, 0.4);
-        border-radius: 3px;
+        background: var(--color-border);
+        border-radius: 2px;
         outline: none;
         cursor: pointer;
 
         &::-webkit-slider-runnable-track {
-          height: 6px;
-          border-radius: 3px;
-          background: rgba(148, 163, 184, 0.4);
+          height: 4px;
+          border-radius: 2px;
+          background: var(--color-border);
         }
 
         &::-moz-range-track {
-          height: 6px;
-          border-radius: 3px;
-          background: rgba(148, 163, 184, 0.4);
+          height: 4px;
+          border-radius: 2px;
+          background: var(--color-border);
         }
 
         &::-webkit-slider-thumb {
           -webkit-appearance: none;
           appearance: none;
-          width: 18px;
-          height: 18px;
+          width: 14px;
+          height: 14px;
           border-radius: 50%;
           background: var(--slider-color, var(--color-accent));
           cursor: pointer;
-          border: 3px solid var(--color-bg-secondary);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          border: 2px solid var(--color-bg-secondary);
           transition: transform 0.15s ease;
-          margin-top: -6px;
+          margin-top: -5px;
+          box-shadow: 0 0 0 1px var(--color-border);
 
           &:hover {
-            transform: scale(1.1);
+            transform: scale(1.15);
           }
         }
 
         &::-moz-range-thumb {
-          width: 18px;
-          height: 18px;
+          width: 14px;
+          height: 14px;
           border-radius: 50%;
           background: var(--slider-color, var(--color-accent));
           cursor: pointer;
-          border: 3px solid var(--color-bg-secondary);
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          border: 2px solid var(--color-bg-secondary);
+          box-shadow: 0 0 0 1px var(--color-border);
         }
       }
 
@@ -251,23 +253,26 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
         display: flex;
         align-items: center;
         gap: 0.125rem;
-        min-width: 55px;
+        min-width: 52px;
       }
 
       .allocation-input {
-        width: 40px;
-        padding: 0.25rem 0.375rem;
+        width: 38px;
+        padding: 0.2rem 0.3rem;
         border: 1px solid var(--color-border);
-        border-radius: 6px;
-        font-size: 0.8rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
         font-weight: 600;
         text-align: center;
         color: var(--color-text-primary);
         background: var(--color-bg-secondary);
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-variant-numeric: tabular-nums;
 
         &:focus {
           outline: none;
           border-color: var(--color-accent);
+          box-shadow: 0 0 0 2px var(--color-accent-light);
         }
 
         /* Hide number input spinners */
@@ -280,17 +285,17 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
       }
 
       .percent {
-        font-size: 0.75rem;
+        font-size: 0.6875rem;
         color: var(--color-text-muted);
-        font-weight: 600;
+        font-weight: 500;
       }
 
       .portfolio-bar {
         display: flex;
-        height: 8px;
-        border-radius: 4px;
+        height: 6px;
+        border-radius: 3px;
         overflow: hidden;
-        margin-top: 1rem;
+        margin-top: 0.875rem;
         background: var(--color-border);
       }
 
@@ -301,25 +306,28 @@ export const AVAILABLE_ETFS: PortfolioETF[] = [
 
       .quick-presets {
         display: flex;
-        gap: 0.5rem;
-        margin-top: 0.875rem;
+        gap: 0.4rem;
+        margin-top: 0.75rem;
       }
 
       .preset-btn {
         flex: 1;
-        padding: 0.5rem 0.75rem;
+        padding: 0.4rem 0.6rem;
         border: 1px solid var(--color-border);
-        border-radius: 8px;
+        border-radius: 4px;
         background: var(--color-bg-secondary);
         color: var(--color-text-secondary);
-        font-size: 0.75rem;
-        font-weight: 600;
+        font-size: 0.6875rem;
+        font-weight: 500;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.15s ease;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
 
         &:hover {
           border-color: var(--color-accent);
           color: var(--color-accent);
+          background: var(--color-accent-light);
         }
       }
     `,
@@ -349,7 +357,10 @@ export class PortfolioAllocatorComponent implements OnInit {
 
   onAllocationChange(changedIndex: number): void {
     // Clamp value between 0 and 100
-    this.allocations[changedIndex] = Math.max(0, Math.min(100, this.allocations[changedIndex] || 0));
+    this.allocations[changedIndex] = Math.max(
+      0,
+      Math.min(100, this.allocations[changedIndex] || 0)
+    );
     this.emitAllocations();
   }
 

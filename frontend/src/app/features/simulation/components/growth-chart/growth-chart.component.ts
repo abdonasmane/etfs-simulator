@@ -44,12 +44,14 @@ export interface CompareSeries {
       .chart-container {
         position: relative;
         width: 100%;
-        height: 300px;
+        height: 320px;
         background: var(--color-bg-secondary);
-        border-radius: 12px;
-        padding: 1rem;
-        box-shadow: 0 2px 4px var(--color-card-shadow);
-        transition: background-color 0.3s ease;
+        border: 1px solid var(--color-border);
+        border-radius: 8px;
+        padding: 1.25rem;
+        transition:
+          background-color 0.25s ease,
+          border-color 0.25s ease;
       }
     `,
   ],
@@ -121,30 +123,30 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     const isDark = this.themeService.isDark();
     return isDark
       ? {
-          text: '#f1f5f9',
-          textMuted: '#94a3b8',
-          grid: '#334155',
+          text: '#fafafa',
+          textMuted: '#737373',
+          grid: '#26262b',
           accent: '#818cf8',
-          accentLight: 'rgba(129, 140, 248, 0.2)',
-          contributed: '#64748b',
-          optimistic: 'rgba(52, 211, 153, 0.6)',
-          pessimistic: 'rgba(248, 113, 113, 0.6)',
-          tooltipBg: '#1e293b',
-          compare: '#f59e0b',
-          compareLight: 'rgba(245, 158, 11, 0.2)',
+          accentLight: 'rgba(129, 140, 248, 0.15)',
+          contributed: '#525258',
+          optimistic: 'rgba(74, 222, 128, 0.5)',
+          pessimistic: 'rgba(248, 113, 113, 0.5)',
+          tooltipBg: '#131316',
+          compare: '#fbbf24',
+          compareLight: 'rgba(251, 191, 36, 0.15)',
         }
       : {
-          text: '#1a1a2e',
-          textMuted: '#94a3b8',
-          grid: '#f1f5f9',
-          accent: '#4361ee',
-          accentLight: 'rgba(67, 97, 238, 0.15)',
-          contributed: '#94a3b8',
-          optimistic: 'rgba(34, 197, 94, 0.5)',
-          pessimistic: 'rgba(239, 68, 68, 0.5)',
-          tooltipBg: '#1a1a2e',
-          compare: '#d97706',
-          compareLight: 'rgba(217, 119, 6, 0.15)',
+          text: '#09090b',
+          textMuted: '#a3a3a3',
+          grid: '#f0f0f0',
+          accent: '#4f46e5',
+          accentLight: 'rgba(79, 70, 229, 0.1)',
+          contributed: '#a3a3a3',
+          optimistic: 'rgba(21, 128, 61, 0.4)',
+          pessimistic: 'rgba(185, 28, 28, 0.4)',
+          tooltipBg: '#09090b',
+          compare: '#b45309',
+          compareLight: 'rgba(180, 83, 9, 0.1)',
         };
   }
 
@@ -182,31 +184,42 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
             align: 'end',
             labels: {
               usePointStyle: true,
-              padding: 20,
+              pointStyle: 'circle',
+              boxWidth: 8,
+              boxHeight: 8,
+              padding: 16,
               color: colors.text,
               font: {
-                size: 12,
-                family: '-apple-system, BlinkMacSystemFont, sans-serif',
+                size: 11,
+                weight: 500,
+                family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
               },
             },
           },
           tooltip: {
             backgroundColor: colors.tooltipBg,
             titleColor: '#ffffff',
-            bodyColor: '#e2e8f0',
+            bodyColor: '#d4d4d4',
+            borderColor: 'rgba(255,255,255,0.06)',
+            borderWidth: 1,
             titleFont: {
-              size: 14,
-              weight: 'bold',
+              size: 12,
+              weight: 600,
+              family: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
             },
             bodyFont: {
-              size: 13,
+              size: 12,
+              family: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
             },
-            padding: 12,
-            cornerRadius: 8,
+            padding: 10,
+            cornerRadius: 6,
+            displayColors: true,
+            boxPadding: 4,
+            usePointStyle: true,
             callbacks: {
               label: (context): string => {
                 const value = context.parsed.y ?? 0;
-                return `${context.dataset.label}: €${value.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`;
+                return ` ${context.dataset.label}  €${value.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`;
               },
             },
           },
@@ -217,10 +230,14 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
             grid: {
               display: false,
             },
+            border: {
+              color: colors.grid,
+            },
             ticks: {
               maxTicksLimit: 8,
               font: {
-                size: 11,
+                size: 10,
+                family: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
               },
               color: colors.textMuted,
             },
@@ -229,14 +246,20 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
             display: true,
             grid: {
               color: colors.grid,
+              tickLength: 0,
+            },
+            border: {
+              display: false,
             },
             ticks: {
               callback: (value): string =>
                 `€${Number(value).toLocaleString('de-DE', { notation: 'compact' })}`,
               font: {
-                size: 11,
+                size: 10,
+                family: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
               },
               color: colors.textMuted,
+              padding: 8,
             },
           },
         },

@@ -81,65 +81,55 @@ import { ThemeService } from '../../../core/services';
       }
 
       .toggle-track {
-        width: 52px;
-        height: 28px;
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        border-radius: 14px;
-        padding: 3px;
-        transition: background 0.3s ease;
+        width: 44px;
+        height: 24px;
+        background: var(--color-bg-tertiary);
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        padding: 2px;
+        transition:
+          background 0.25s ease,
+          border-color 0.25s ease;
         position: relative;
-        overflow: hidden;
-
-        &::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-          opacity: 0;
-          transition: opacity 0.3s ease;
-          border-radius: 14px;
-        }
       }
 
-      .dark .toggle-track::before {
-        opacity: 1;
+      .dark .toggle-track {
+        background: var(--color-bg-tertiary);
+        border-color: var(--color-border-strong);
       }
 
       .toggle-thumb {
-        width: 22px;
-        height: 22px;
-        background: white;
+        width: 18px;
+        height: 18px;
+        background: var(--color-bg-secondary);
+        border: 1px solid var(--color-border-strong);
         border-radius: 50%;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
         position: relative;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       }
 
       .dark .toggle-thumb {
-        transform: translateX(24px);
+        transform: translateX(20px);
       }
 
       .icon {
-        width: 14px;
-        height: 14px;
+        width: 12px;
+        height: 12px;
         position: absolute;
-        transition: all 0.3s ease;
+        transition: all 0.25s ease;
       }
 
       .sun {
-        color: #f59e0b;
+        color: var(--color-warning);
         opacity: 1;
         transform: rotate(0deg) scale(1);
       }
 
       .moon {
-        color: #3b82f6;
+        color: var(--color-accent);
         opacity: 0;
         transform: rotate(-90deg) scale(0.5);
       }

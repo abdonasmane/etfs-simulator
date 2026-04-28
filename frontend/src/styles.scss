@@ -3,87 +3,117 @@
  * Supports light and dark themes via CSS custom properties.
  */
 
-// Import Inter font
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+// Inter for UI, JetBrains Mono for numerical/tabular figures.
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 // ============================================
 // CSS Custom Properties (Theme Variables)
 // ============================================
 
 :root {
-  // Light theme (default)
-  --color-bg-primary: #f8fafc;
+  // ─── Surfaces ─────────────────────────────────
+  --color-bg-primary: #fafafa;
   --color-bg-secondary: #ffffff;
-  --color-bg-tertiary: #f1f5f9;
-  --color-bg-hover: #e2e8f0;
-  
-  --color-text-primary: #1a1a2e;
-  --color-text-secondary: #64748b;
-  --color-text-muted: #94a3b8;
-  
-  --color-border: #e2e8f0;
-  --color-border-light: #f1f5f9;
-  
-  --color-accent: #4361ee;
-  --color-accent-hover: #3451d1;
-  --color-accent-light: rgba(67, 97, 238, 0.1);
-  
-  --color-success: #10b981;
-  --color-success-light: rgba(16, 185, 129, 0.1);
-  
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
-  
-  --color-card-shadow: rgba(0, 0, 0, 0.06);
-  --color-card-shadow-hover: rgba(0, 0, 0, 0.1);
-  
-  --color-scrollbar-track: #f1f5f9;
-  --color-scrollbar-thumb: #cbd5e1;
-  --color-scrollbar-thumb-hover: #94a3b8;
-  
-  --color-selection: rgba(67, 97, 238, 0.2);
-  
-  // Gradient for hero
-  --gradient-hero: linear-gradient(135deg, #4361ee 0%, #3a0ca3 100%);
-  --color-hero-shadow: rgba(67, 97, 238, 0.3);
+  --color-bg-tertiary: #f5f5f5;
+  --color-bg-hover: #ececec;
 
+  // ─── Text ─────────────────────────────────────
+  --color-text-primary: #09090b;
+  --color-text-secondary: #525252;
+  --color-text-muted: #a3a3a3;
+
+  // ─── Borders ──────────────────────────────────
+  --color-border: #e5e5e5;
+  --color-border-light: #f0f0f0;
+  --color-border-strong: #d4d4d4;
+
+  // ─── Accent (refined indigo) ──────────────────
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-light: rgba(79, 70, 229, 0.08);
+  --color-accent-on: #ffffff;
+
+  // ─── Semantic ─────────────────────────────────
+  --color-success: #15803d;
+  --color-success-light: rgba(21, 128, 61, 0.08);
+  --color-error: #b91c1c;
+  --color-error-light: rgba(185, 28, 28, 0.08);
+  --color-warning: #b45309;
+
+  // ─── Shadows (warm, layered) ──────────────────
+  --color-card-shadow: rgba(9, 9, 11, 0.04);
+  --color-card-shadow-hover: rgba(9, 9, 11, 0.08);
+  --shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.04);
+  --shadow-md: 0 1px 3px rgba(9, 9, 11, 0.05), 0 4px 12px rgba(9, 9, 11, 0.04);
+  --shadow-lg: 0 2px 4px rgba(9, 9, 11, 0.04), 0 12px 32px rgba(9, 9, 11, 0.08);
+
+  // ─── Misc ─────────────────────────────────────
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #d4d4d4;
+  --color-scrollbar-thumb-hover: #a3a3a3;
+  --color-selection: rgba(79, 70, 229, 0.18);
+
+  // ─── Radii / spacing tokens ───────────────────
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  // ─── Hero (legacy var kept for compat; flat now, no gradient) ───
+  --gradient-hero: var(--color-bg-secondary);
+  --color-hero-shadow: rgba(9, 9, 11, 0.08);
+
+  // ─── Type ─────────────────────────────────────
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell,
+    sans-serif;
+  --font-mono:
+    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
 }
 
 [data-theme='dark'] {
-  --color-bg-primary: #0f172a;
-  --color-bg-secondary: #1e293b;
-  --color-bg-tertiary: #334155;
-  --color-bg-hover: #475569;
-  
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
-  
-  --color-border: #334155;
-  --color-border-light: #1e293b;
-  
+  // ─── Surfaces ─────────────────────────────────
+  --color-bg-primary: #09090b;
+  --color-bg-secondary: #131316;
+  --color-bg-tertiary: #1c1c20;
+  --color-bg-hover: #26262b;
+
+  // ─── Text ─────────────────────────────────────
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #a3a3a3;
+  --color-text-muted: #737373;
+
+  // ─── Borders ──────────────────────────────────
+  --color-border: #26262b;
+  --color-border-light: #1c1c20;
+  --color-border-strong: #3a3a40;
+
+  // ─── Accent (brighter in dark for AA contrast) ───
   --color-accent: #818cf8;
   --color-accent-hover: #a5b4fc;
-  --color-accent-light: rgba(129, 140, 248, 0.15);
-  
-  --color-success: #34d399;
-  --color-success-light: rgba(52, 211, 153, 0.15);
-  
-  --color-error: #f87171;
-  --color-warning: #fbbf24;
-  
-  --color-card-shadow: rgba(0, 0, 0, 0.3);
-  --color-card-shadow-hover: rgba(0, 0, 0, 0.4);
-  
-  --color-scrollbar-track: #1e293b;
-  --color-scrollbar-thumb: #475569;
-  --color-scrollbar-thumb-hover: #64748b;
-  
-  --color-selection: rgba(129, 140, 248, 0.3);
-  
-  --gradient-hero: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
-  --color-hero-shadow: rgba(99, 102, 241, 0.3);
+  --color-accent-light: rgba(129, 140, 248, 0.12);
+  --color-accent-on: #09090b;
 
+  // ─── Semantic ─────────────────────────────────
+  --color-success: #4ade80;
+  --color-success-light: rgba(74, 222, 128, 0.12);
+  --color-error: #f87171;
+  --color-error-light: rgba(248, 113, 113, 0.12);
+  --color-warning: #fbbf24;
+
+  // ─── Shadows (subtler — contrast is from bg) ──
+  --color-card-shadow: rgba(0, 0, 0, 0.3);
+  --color-card-shadow-hover: rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  // ─── Misc ─────────────────────────────────────
+  --color-scrollbar-track: transparent;
+  --color-scrollbar-thumb: #3a3a40;
+  --color-scrollbar-thumb-hover: #525258;
+  --color-selection: rgba(129, 140, 248, 0.25);
 }
 
 // ============================================
@@ -100,26 +130,32 @@ html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   padding: 0;
-  font-family:
-    'Inter',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings:
+    'cv02', 'cv03', 'cv04', 'cv11'; // Inter stylistic alternates — slightly more refined letterforms
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   line-height: 1.5;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  letter-spacing: -0.005em;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+// Tabular figures everywhere we render numbers — the actual mono switch is
+// applied at component level via `.num` or font-family declarations.
+.num,
+.tabular,
+[data-tabular] {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
 }
 
 a {
@@ -134,15 +170,17 @@ a {
 
 button {
   font-family: inherit;
+  letter-spacing: -0.005em;
 }
 
 input,
 select,
 textarea {
   font-family: inherit;
+  letter-spacing: -0.005em;
 }
 
-// Custom scrollbar
+// Scrollbar — slimmer, near-invisible track
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -150,19 +188,18 @@ textarea {
 
 ::-webkit-scrollbar-track {
   background: var(--color-scrollbar-track);
-  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--color-scrollbar-thumb);
-  border-radius: 4px;
+  border-radius: 8px;
 
   &:hover {
     background: var(--color-scrollbar-thumb-hover);
   }
 }
 
-// Number input - hide spinners
+// Number input — hide native spinners
 input[type='number']::-webkit-inner-spin-button,
 input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -173,9 +210,7 @@ input[type='number'] {
   -moz-appearance: textfield;
 }
 
-// Selection color
 ::selection {
   background: var(--color-selection);
   color: var(--color-text-primary);
 }
-
