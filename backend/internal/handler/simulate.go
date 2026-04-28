@@ -46,10 +46,12 @@ type SimulateByYearsRequest struct {
 	// Mutually exclusive with ContributionGrowthAmount.
 	ContributionGrowthRate *float64 `json:"contributionGrowthRate,omitempty" example:"3.0"`
 
-	// ContributionGrowthAmount is a fixed annual euro increase to the monthly contribution
-	// (e.g., 600 means "add €600/year split evenly = €50/month each month"). Mutually
-	// exclusive with ContributionGrowthRate.
-	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"600"`
+	// ContributionGrowthAmount is a fixed yearly euro increase applied stepwise
+	// at each anniversary: the monthly contribution stays flat for 12 months,
+	// then jumps by this amount on month 13 / 25 / 37 … (e.g., 500 with a
+	// €500/mo base → year 1 is €500/mo, year 2 is €1000/mo, year 3 is €1500/mo).
+	// Mutually exclusive with ContributionGrowthRate.
+	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"500"`
 }
 
 // SimulateByTargetRequest is the input for simulating until a target date.
@@ -80,10 +82,12 @@ type SimulateByTargetRequest struct {
 	// Mutually exclusive with ContributionGrowthAmount.
 	ContributionGrowthRate *float64 `json:"contributionGrowthRate,omitempty" example:"3.0"`
 
-	// ContributionGrowthAmount is a fixed annual euro increase to the monthly contribution
-	// (e.g., 600 means "add €600/year split evenly = €50/month each month"). Mutually
-	// exclusive with ContributionGrowthRate.
-	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"600"`
+	// ContributionGrowthAmount is a fixed yearly euro increase applied stepwise
+	// at each anniversary: the monthly contribution stays flat for 12 months,
+	// then jumps by this amount on month 13 / 25 / 37 … (e.g., 500 with a
+	// €500/mo base → year 1 is €500/mo, year 2 is €1000/mo, year 3 is €1500/mo).
+	// Mutually exclusive with ContributionGrowthRate.
+	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"500"`
 }
 
 // --- Response Types ---
@@ -491,10 +495,16 @@ func resolveContributionGrowth(rate, amount *float64) (float64, float64, error) 
 
 // simulateMonthly calculates month-by-month portfolio growth with growing contributions.
 //
-// Two contribution-growth modes can be applied (and combined, though the
-// handlers reject requests that set both): contributionGrowth is an annual
-// percentage compounded monthly, contributionGrowthAmount is a flat annual
-// euro increase distributed evenly across months. Both default to 0.
+// Two contribution-growth modes are supported (handlers reject requests that
+// set both):
+//   - contributionGrowth is an annual percentage compounded monthly — i.e. the
+//     monthly contribution grows smoothly each month so the year-over-year
+//     change matches the configured percentage.
+//   - contributionGrowthAmount is a flat annual euro increase applied
+//     STEPWISE at year anniversaries: the monthly contribution stays flat for
+//     12 months, then jumps by the configured amount on month 13, 25, 37, …
+//
+// Both default to 0.
 func simulateMonthly(
 	initial, monthlyBase float64,
 	startYear, startMonth, totalMonths int,
@@ -502,7 +512,6 @@ func simulateMonthly(
 ) []MonthProjection {
 	monthlyReturnRate := math.Pow(1+annualRate/100, 1.0/12.0) - 1
 	monthlyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/12.0) - 1
-	monthlyContributionAmount := contributionGrowthAmount / 12.0
 
 	projections := make([]MonthProjection, 0, totalMonths)
 	balance := initial
@@ -513,6 +522,13 @@ func simulateMonthly(
 	currentMonth := startMonth
 
 	for i := 0; i < totalMonths; i++ {
+		// At each year anniversary (i = 12, 24, 36, …) bump the monthly
+		// contribution by the fixed yearly amount BEFORE recording this
+		// month, so the new value applies to all 12 months of the new year.
+		if i > 0 && i%12 == 0 {
+			currentContribution += contributionGrowthAmount
+		}
+
 		currentMonth++
 		if currentMonth > 12 {
 			currentMonth = 1
@@ -532,11 +548,8 @@ func simulateMonthly(
 			PortfolioValue:      round2(balance),
 		})
 
-		// Grow contribution for next month: percentage first, then flat amount.
-		// Order doesn't matter when one of them is 0 (the common case); when
-		// both are non-zero this matches "compound the percent on this month's
-		// base, then add the flat increment" — straightforward semantics.
-		currentContribution = currentContribution*(1+monthlyContributionGrowth) + monthlyContributionAmount
+		// Smooth percentage compounding for next month (no-op when rate is 0).
+		currentContribution *= (1 + monthlyContributionGrowth)
 	}
 
 	return projections

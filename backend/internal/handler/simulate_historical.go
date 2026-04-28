@@ -37,10 +37,12 @@ type SimulateHistoricalRequest struct {
 	// Mutually exclusive with ContributionGrowthAmount.
 	ContributionGrowthRate *float64 `json:"contributionGrowthRate,omitempty" example:"3.0"`
 
-	// ContributionGrowthAmount is a fixed annual euro increase to the monthly contribution
-	// (e.g., 600 means "add €600/year split evenly = €50/month each month"). Mutually
-	// exclusive with ContributionGrowthRate.
-	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"600"`
+	// ContributionGrowthAmount is a fixed yearly euro increase applied stepwise
+	// at each anniversary: the monthly contribution stays flat for 12 months,
+	// then jumps by this amount on month 13 / 25 / 37 … (e.g., 500 with a
+	// €500/mo base → year 1 is €500/mo, year 2 is €1000/mo, year 3 is €1500/mo).
+	// Mutually exclusive with ContributionGrowthRate.
+	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"500"`
 }
 
 // HistoricalSimulateSummary contains the actual results of a historical simulation.
@@ -294,7 +296,6 @@ func runHistoricalSimulation(
 	contributionGrowth, contributionGrowthAmount float64,
 ) ([]MonthProjection, HistoricalSimulateSummary, error) {
 	monthlyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/12.0) - 1
-	monthlyContributionAmount := contributionGrowthAmount / 12.0
 
 	// Establish a baseline price for every symbol from the months immediately
 	// preceding startDate. Walks back up to 12 months to absorb a leading
@@ -313,8 +314,16 @@ func runHistoricalSimulation(
 	totalContributed := initial
 	currentContribution := monthlyBase
 	projections := make([]MonthProjection, 0)
+	monthIndex := 0
 
 	for curDate := startDate; !curDate.After(endDate); curDate = curDate.AddDate(0, 1, 0) {
+		// At each year anniversary (months 12, 24, 36, …) bump the monthly
+		// contribution by the fixed yearly amount. The bump happens BEFORE
+		// recording, so all 12 months of the new year carry the new value.
+		if monthIndex > 0 && monthIndex%12 == 0 {
+			currentContribution += contributionGrowthAmount
+		}
+
 		curKey := curDate.Format("2006-01")
 
 		var blendedReturn float64
@@ -345,7 +354,9 @@ func runHistoricalSimulation(
 			PortfolioValue:      round2(balance),
 		})
 
-		currentContribution = currentContribution*(1+monthlyContributionGrowth) + monthlyContributionAmount
+		// Smooth percentage compounding for next month (no-op when rate is 0).
+		currentContribution *= (1 + monthlyContributionGrowth)
+		monthIndex++
 	}
 
 	if len(projections) == 0 {

@@ -313,13 +313,19 @@ export class SimulationFormComponent {
   }
 
   /**
-   * Human-readable monthly equivalent of the fixed-amount growth, used in the
-   * helper text. Rounds to the nearest euro since the bump is split evenly
-   * across 12 months in the backend.
+   * Preview of the first three years of monthly contributions under the
+   * stepwise fixed-amount growth model: contribution stays flat for 12 months,
+   * then jumps by `contributionGrowthAmount` at each anniversary. Helps users
+   * see immediately what their plan looks like.
    */
-  get growthAmountPerMonth(): number {
-    const annual = Number(this.form.value.contributionGrowthAmount) || 0;
-    return Math.round(annual / 12);
+  get growthAmountPreview(): { year: number; monthly: number }[] {
+    const base = Number(this.form.value.monthlyContribution) || 0;
+    const step = Number(this.form.value.contributionGrowthAmount) || 0;
+    return [
+      { year: 1, monthly: base },
+      { year: 2, monthly: base + step },
+      { year: 3, monthly: base + 2 * step },
+    ];
   }
 
   /** Check if custom return rate input should be shown. */

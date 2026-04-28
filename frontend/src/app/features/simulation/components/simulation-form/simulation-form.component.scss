@@ -315,6 +315,46 @@
   }
 }
 
+// Preview chips for stepwise growth (Y1 €500/mo · Y2 €1000/mo · Y3 €1500/mo …)
+.growth-preview {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+
+  .growth-preview-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.2rem;
+    padding: 0.15rem 0.4rem;
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    font-size: 0.6875rem;
+  }
+
+  .growth-preview-year {
+    color: var(--color-text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .growth-preview-amount {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+
+  .growth-preview-item--more {
+    color: var(--color-text-muted);
+    padding: 0.15rem 0.45rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+}
+
 // ─── Compare-with-another-ETF affordance ─────────
 .compare-toggle {
   margin-top: 0.625rem;
