@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DecimalPipe } from '@angular/common';
 import { trigger, transition, style, animate } from '@angular/animations';
 
@@ -240,6 +240,62 @@ export class SimulationResultsComponent {
     if (this.showMonthly) return rows;
     // Yearly view: keep December of each year, plus the final row regardless.
     return rows.filter((r, i) => r.month === 12 || i === rows.length - 1);
+  }
+
+  // ─── Share button + toast ────────────────────────────────────────────
+  /** Toast message shown after a share / copy action. Empty = hidden. */
+  readonly shareToast = signal<string>('');
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Share or copy the URL of the current simulation. Strategy:
+   *   1. If `navigator.share` is available (most mobile + Edge/Safari on
+   *      desktop), open the native share sheet — the user gets all their
+   *      OS-installed share targets (Messages, AirDrop, WhatsApp, "Copy",
+   *      etc.) and we don't have to second-guess.
+   *   2. Otherwise, write the URL to the clipboard. Modern browsers allow
+   *      this from a click handler in a secure context (HTTPS / localhost).
+   *   3. If clipboard fails (insecure context, denied permission), fall
+   *      back to a manual prompt with the URL pre-filled — the user can
+   *      copy it themselves.
+   *
+   * In all cases we surface a small toast so there's no silent failure.
+   */
+  async share(): Promise<void> {
+    const url = window.location.href;
+
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        // Only pass `url` — never `text`. Some platforms (Edge / macOS Safari
+        // with Web Share, plus several OS share sheets when the user picks
+        // "Copy") concatenate `text + url` into the clipboard, which makes
+        // pasting into a URL bar fail. With just `url`, every target gets a
+        // pure link; messaging apps auto-render previews and the user adds
+        // their own commentary if they want.
+        await navigator.share({ url });
+        // User completed the native share — no toast needed (the OS handled it).
+        return;
+      } catch (err) {
+        // AbortError = user cancelled → silent, no fallback needed.
+        if ((err as DOMException)?.name === 'AbortError') return;
+        // Other errors (NotAllowedError, etc.) → fall through to clipboard.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      this.flashToast('Link copied to clipboard');
+    } catch {
+      // Clipboard not available — last-resort fallback uses prompt() so the
+      // user at least sees the URL and can long-press / Cmd+C to copy it.
+      window.prompt('Copy this link to share your simulation:', url);
+    }
+  }
+
+  private flashToast(message: string): void {
+    this.shareToast.set(message);
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.shareToast.set(''), 2500);
   }
 }
 

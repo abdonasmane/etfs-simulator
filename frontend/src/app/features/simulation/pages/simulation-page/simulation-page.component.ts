@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { trigger, transition, style, animate, query } from '@angular/animations';
 import { forkJoin, Observable, of } from 'rxjs';
@@ -19,6 +19,7 @@ import {
 } from '../../components/simulation-form/simulation-form.component';
 import { SimulationResultsComponent } from '../../components/simulation-results/simulation-results.component';
 import { ThemeToggleComponent } from '../../../../shared/components/theme-toggle/theme-toggle.component';
+import { decodeSimulationParams, encodeSimulationParams } from '../../share-url.helper';
 
 /**
  * Main page for investment simulation.
@@ -50,7 +51,7 @@ import { ThemeToggleComponent } from '../../../../shared/components/theme-toggle
     ]),
   ],
 })
-export class SimulationPageComponent {
+export class SimulationPageComponent implements OnInit {
   private readonly apiService = inject(ApiService);
 
   /** State using signals for better reactivity */
@@ -58,6 +59,12 @@ export class SimulationPageComponent {
   readonly error = signal<string | null>(null);
   readonly summary = signal<SimulateSummary | null>(null);
   readonly projections = signal<MonthProjection[]>([]);
+  /**
+   * Pre-filled form values decoded from the URL on page load. Passed down to
+   * the form so it can mirror the shared simulation while the page also
+   * auto-submits in parallel — recipient lands directly on the result.
+   */
+  readonly prefill = signal<SimulationFormData | null>(null);
   /**
    * Daily portfolio snapshots from the historical endpoint, used to render
    * the chart at full daily resolution. Empty for years/target modes (which
@@ -77,11 +84,26 @@ export class SimulationPageComponent {
   readonly resultKey = signal(0);
 
   /**
+   * On page load, hydrate from URL params if present and auto-run the
+   * simulation so the recipient of a shared link lands directly on the
+   * result. Malformed/missing params are silently ignored — defaults stand.
+   */
+  ngOnInit(): void {
+    const params = new URLSearchParams(window.location.search);
+    if (params.toString() === '') return;
+    const decoded = decodeSimulationParams(params);
+    if (!decoded) return;
+    this.prefill.set(decoded);
+    this.onSimulate(decoded);
+  }
+
+  /**
    * Handle form submission and call the appropriate API based on mode.
    */
   onSimulate(data: SimulationFormData): void {
     this.loading.set(true);
     this.error.set(null);
+    this.syncUrl(data);
 
     if (data.mode === 'years' && data.years) {
       this.apiService
@@ -266,5 +288,17 @@ export class SimulationPageComponent {
     this.dailyPoints.set(dailyPoints);
     this.resultKey.update(k => (k + 1) % 10000000);
     this.loading.set(false);
+  }
+
+  /**
+   * Reflect the submitted simulation in the URL using replaceState so a copy
+   * of the address bar is a shareable link. We use replaceState rather than
+   * pushState because each submit isn't a separate "page" — the back button
+   * shouldn't unwind individual parameter tweaks.
+   */
+  private syncUrl(data: SimulationFormData): void {
+    const params = encodeSimulationParams(data);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, '', newUrl);
   }
 }

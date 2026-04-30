@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, inject } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormBuilder,
@@ -75,8 +75,16 @@ interface IndexOption extends SelectOption {
   templateUrl: './simulation-form.component.html',
   styleUrl: './simulation-form.component.scss',
 })
-export class SimulationFormComponent {
+export class SimulationFormComponent implements OnInit {
   @Output() simulate = new EventEmitter<SimulationFormData>();
+
+  /**
+   * Form values pre-filled from the URL on page load. When non-null, the
+   * form mirrors the loaded simulation in all visible fields (mode, ETF,
+   * dates, allocations, growth choice). The page also auto-submits in
+   * parallel — we don't re-emit from the form to avoid double-firing.
+   */
+  @Input() prefill: SimulationFormData | null = null;
 
   form: FormGroup;
   mode: 'years' | 'target' | 'whatif' = 'years';
@@ -194,10 +202,76 @@ export class SimulationFormComponent {
         }
       },
       error: () => {
-        // Silent fallback: with no index metadata the picker stays unconstrained
-        // (1993+) and the backend will surface any genuinely invalid date.
+        // Silent fallback — picker stays unconstrained, backend validates.
       },
     });
+  }
+
+  ngOnInit(): void {
+    if (this.prefill) {
+      this.applyPrefill(this.prefill);
+    }
+  }
+
+  /**
+   * Mirror a previously-shared simulation in the form. Sets mode, primary
+   * fields, growth-mode selection, return-source selection (ETF / portfolio
+   * / custom rate), historical date, and comparison ETF. Does NOT re-emit
+   * `simulate` — the page already auto-runs in parallel from `ngOnInit`.
+   */
+  private applyPrefill(data: SimulationFormData): void {
+    this.mode = data.mode;
+
+    const targetYearsFromNow =
+      data.targetYear !== undefined ? Math.max(1, data.targetYear - this.currentYear) : 10;
+
+    this.form.patchValue({
+      initialInvestment: data.initialInvestment,
+      monthlyContribution: data.monthlyContribution,
+      contributionGrowthRate: data.contributionGrowthRate,
+      contributionGrowthAmount:
+        data.contributionGrowthAmount > 0 ? data.contributionGrowthAmount : 600,
+      annualReturnRate: data.annualReturnRate ?? 7,
+      years: data.years ?? 10,
+      targetMonth: data.targetMonth ?? 12,
+      targetYearsFromNow,
+    });
+
+    // Growth mode: -2 fixed €/yr, -1 custom %, else preset percent literal.
+    if (data.contributionGrowthAmount > 0) {
+      this.selectedGrowthOption = -2;
+    } else if (data.contributionGrowthRate > 0) {
+      const preset = this.growthOptions.find(o => o.value === data.contributionGrowthRate);
+      this.selectedGrowthOption = preset ? Number(preset.value) : -1;
+    } else {
+      this.selectedGrowthOption = 0;
+    }
+
+    // Return source.
+    if (data.portfolio && data.portfolio.length > 0) {
+      this.selectedReturnOption = -2; // Custom Portfolio
+      this.portfolioAllocations = data.portfolio.map(a => ({
+        symbol: a.symbol,
+        weight: a.weight,
+      }));
+    } else if (data.indexSymbol) {
+      const opt = this.returnOptions.find(o => o.symbol === data.indexSymbol);
+      if (opt) this.selectedReturnOption = Number(opt.value);
+    } else if (data.annualReturnRate !== undefined) {
+      this.selectedReturnOption = -1; // Custom rate
+    }
+
+    // Historical date.
+    if (data.startYear !== undefined) this.selectedHistoricalYear = data.startYear;
+    if (data.startMonth !== undefined) this.selectedHistoricalMonth = data.startMonth;
+
+    // Comparison ETF.
+    if (data.compareIndexSymbol) {
+      const opt = this.returnOptions.find(o => o.symbol === data.compareIndexSymbol);
+      if (opt) this.selectedCompareReturnOption = Number(opt.value);
+    } else {
+      this.selectedCompareReturnOption = null;
+    }
   }
 
   /** Get the currently selected index symbol (if any). */

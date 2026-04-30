@@ -16,7 +16,7 @@
   <!-- Main content area -->
   <div class="main-content">
     <aside class="form-section">
-      <app-simulation-form (simulate)="onSimulate($event)" />
+      <app-simulation-form (simulate)="onSimulate($event)" [prefill]="prefill()" />
     </aside>
 
     <main class="results-section">

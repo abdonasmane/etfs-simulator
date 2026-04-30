@@ -1,7 +1,111 @@
 .simulation-results {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+// ─────────────────────────────────────────────
+// Share button — top-right of the result area
+// ─────────────────────────────────────────────
+.share-btn {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem 0.35rem 0.55rem;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+
+  &:hover {
+    color: var(--color-accent);
+    border-color: var(--color-accent);
+    background: var(--color-accent-light);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  // On narrow screens, drop the label and keep just the icon — the hero
+  // titles can otherwise crowd the button.
+  @media (max-width: 480px) {
+    span {
+      display: none;
+    }
+    padding: 0.4rem;
+    width: 30px;
+    height: 30px;
+    justify-content: center;
+  }
+}
+
+// Push the hero label down slightly so it doesn't sit under the share button.
+.compare-hero,
+.hero-result {
+  // The pre-existing top-padding already accommodates content; the share
+  // button is small enough (28-30px tall) to fit in the corner without
+  // visually clashing with the centered text below it.
+}
+
+// ─────────────────────────────────────────────
+// Toast — fixed bottom-center, auto-dismiss
+// ─────────────────────────────────────────────
+.share-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-text-primary);
+  color: var(--color-bg-primary);
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  box-shadow: var(--shadow-lg);
+  animation: shareToastIn 0.2s ease-out;
+  pointer-events: none;
+  white-space: nowrap;
+
+  svg {
+    color: var(--color-success);
+    flex-shrink: 0;
+  }
+}
+
+@keyframes shareToastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 // ─────────────────────────────────────────────
