@@ -19,7 +19,11 @@ import {
 } from '../../components/simulation-form/simulation-form.component';
 import { SimulationResultsComponent } from '../../components/simulation-results/simulation-results.component';
 import { ThemeToggleComponent } from '../../../../shared/components/theme-toggle/theme-toggle.component';
-import { decodeSimulationParams, encodeSimulationParams } from '../../share-url.helper';
+import {
+  decodeShowRealValues,
+  decodeSimulationParams,
+  encodeSimulationParams,
+} from '../../share-url.helper';
 
 /**
  * Main page for investment simulation.
@@ -65,6 +69,13 @@ export class SimulationPageComponent implements OnInit {
    * auto-submits in parallel — recipient lands directly on the result.
    */
   readonly prefill = signal<SimulationFormData | null>(null);
+
+  /**
+   * "Today's €" view-preference toggle. Lifted to the page so it can be
+   * encoded into the share URL — sharing a real-terms view shouldn't show
+   * the recipient a different (nominal) headline number.
+   */
+  readonly showRealValues = signal(false);
   /**
    * Daily portfolio snapshots from the historical endpoint, used to render
    * the chart at full daily resolution. Empty for years/target modes (which
@@ -91,10 +102,31 @@ export class SimulationPageComponent implements OnInit {
   ngOnInit(): void {
     const params = new URLSearchParams(window.location.search);
     if (params.toString() === '') return;
+    // View prefs decode independently of the simulation params — even if
+    // the simulation URL is malformed, an explicit ?real=1 still wins.
+    this.showRealValues.set(decodeShowRealValues(params));
     const decoded = decodeSimulationParams(params);
     if (!decoded) return;
     this.prefill.set(decoded);
     this.onSimulate(decoded);
+  }
+
+  /**
+   * Pick up toggle changes from the results component and re-sync the URL
+   * so the latest view preference is captured in the address bar (and any
+   * subsequent share). The page keeps the latest form submission cached
+   * implicitly via summary/projections — but for URL purposes we don't
+   * need to re-encode the simulation, just the toggle flag.
+   */
+  onRealValuesToggle(real: boolean): void {
+    this.showRealValues.set(real);
+    // Patch only the `real` query param; leave the rest of the URL alone.
+    const params = new URLSearchParams(window.location.search);
+    if (real) params.set('real', '1');
+    else params.delete('real');
+    const search = params.toString();
+    const newUrl = `${window.location.pathname}${search ? '?' + search : ''}`;
+    window.history.replaceState(null, '', newUrl);
   }
 
   /**
@@ -297,7 +329,9 @@ export class SimulationPageComponent implements OnInit {
    * shouldn't unwind individual parameter tweaks.
    */
   private syncUrl(data: SimulationFormData): void {
-    const params = encodeSimulationParams(data);
+    const params = encodeSimulationParams(data, {
+      showRealValues: this.showRealValues(),
+    });
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     window.history.replaceState(null, '', newUrl);
   }

@@ -13,8 +13,24 @@
 import { AllocationOutput } from '../../shared/components/portfolio-allocator/portfolio-allocator.component';
 import { SimulationFormData } from './components/simulation-form/simulation-form.component';
 
-/** Encode current form state into URLSearchParams. */
-export function encodeSimulationParams(data: SimulationFormData): URLSearchParams {
+/** Optional view preferences that travel with the share URL. */
+export interface SimulationShareOptions {
+  /**
+   * When true, the recipient lands on the result with the "Today's €"
+   * (inflation-adjusted) toggle ON. Encoded as `real=1` in the URL.
+   * View preferences travel along because the headline number changes
+   * dramatically — sharing a "€392k real-terms" plan should NOT show the
+   * recipient the €820k nominal value by default; that would mean two
+   * people looking at the same link see different stories.
+   */
+  showRealValues?: boolean;
+}
+
+/** Encode current form state (and optional view prefs) into URLSearchParams. */
+export function encodeSimulationParams(
+  data: SimulationFormData,
+  opts: SimulationShareOptions = {}
+): URLSearchParams {
   const p = new URLSearchParams();
   p.set('mode', data.mode);
   p.set('initial', String(data.initialInvestment));
@@ -49,7 +65,14 @@ export function encodeSimulationParams(data: SimulationFormData): URLSearchParam
     p.set('rate', stripTrailingZeros(data.annualReturnRate));
   }
 
+  if (opts.showRealValues) p.set('real', '1');
+
   return p;
+}
+
+/** Read the optional `real=1` view-preference flag from URL params. */
+export function decodeShowRealValues(params: URLSearchParams): boolean {
+  return params.get('real') === '1';
 }
 
 /**

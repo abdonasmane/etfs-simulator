@@ -1,4 +1,4 @@
-import { Component, Input, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 import { CommonModule, CurrencyPipe, DecimalPipe } from '@angular/common';
 import { trigger, transition, style, animate } from '@angular/animations';
 
@@ -10,6 +10,13 @@ import {
   SimulateSummary,
 } from '../../../../core/models';
 import { CompareSeries, GrowthChartComponent } from '../growth-chart/growth-chart.component';
+import {
+  isoDateToDecimal,
+  nominalToReal,
+  realAnnualizedReturn,
+  realCumulativeContributed,
+  yearMonthToDecimal,
+} from '../../inflation.helper';
 
 /**
  * Component displaying simulation results with chart and summary.
@@ -62,14 +69,13 @@ export class SimulationResultsComponent {
   showMilestones = false;
 
   /**
-   * Get projections to display based on view mode.
+   * Projections to display in the table, after applying both the inflation
+   * adjustment (if toggled on) and the yearly/monthly filter.
    */
   get displayedProjections(): MonthProjection[] {
-    if (this.showMonthly) {
-      return this.projections;
-    }
-    // Show December of each year, or last projection
-    return this.projections.filter((p, i) => p.month === 12 || i === this.projections.length - 1);
+    const base = this.displayProjections;
+    if (this.showMonthly) return base;
+    return base.filter((p, i) => p.month === 12 || i === base.length - 1);
   }
 
   /**
@@ -115,7 +121,36 @@ export class SimulationResultsComponent {
   }
 
   /**
-   * Check if contribution milestones show any growth.
+   * True when the displayed projection at index `i` has a lower portfolio
+   * value than the previous DISPLAYED row. The comparison is against the
+   * adjacent displayed row (not the underlying month) so yearly view picks
+   * up year-over-year drops and monthly view picks up month-over-month
+   * drops — both useful, both visualized the same way (red text + ▼).
+   */
+  isProjectionDrop(i: number): boolean {
+    if (i <= 0) return false;
+    const rows = this.displayedProjections;
+    return rows[i].portfolioValue < rows[i - 1].portfolioValue;
+  }
+
+  /** Drop check for the primary side of the comparison table. */
+  isPrimaryDrop(i: number): boolean {
+    if (i <= 0) return false;
+    const rows = this.comparisonRows;
+    return rows[i].primaryValue < rows[i - 1].primaryValue;
+  }
+
+  /** Drop check for the secondary side of the comparison table. */
+  isSecondaryDrop(i: number): boolean {
+    if (i <= 0) return false;
+    const rows = this.comparisonRows;
+    return rows[i].secondaryValue < rows[i - 1].secondaryValue;
+  }
+
+  /**
+   * Check if contribution milestones show any growth. Milestones are NOT
+   * inflation-adjusted (they're literal monthly contribution amounts the
+   * user will pay nominally) — so this reads from the raw summary.
    */
   get hasContributionGrowth(): boolean {
     return this.summary.contributionMilestones && this.summary.contributionMilestones.length > 0;
@@ -156,10 +191,9 @@ export class SimulationResultsComponent {
    * at full daily resolution.
    */
   get secondaryChartSeries(): CompareSeries | null {
-    if (!this.comparison) return null;
-    const { secondary, primary } = this.comparison;
-    // If the primary errored but secondary succeeded, the secondary becomes
-    // the primary line on the chart — no compare overlay needed.
+    const c = this.displayComparison; // already inflation-adjusted when toggle is on
+    if (!c) return null;
+    const { secondary, primary } = c;
     if (!primary.summary || !primary.projections) return null;
     if (!secondary.summary || !secondary.projections) return null;
     return {
@@ -186,9 +220,10 @@ export class SimulationResultsComponent {
    * when comparison is off, when sides tie, or when one side has no data.
    */
   get winningSide(): 'primary' | 'secondary' | null {
-    if (!this.comparison) return null;
-    const a = this.comparison.primary.summary?.finalValue;
-    const b = this.comparison.secondary.summary?.finalValue;
+    const c = this.displayComparison;
+    if (!c) return null;
+    const a = c.primary.summary?.finalValue;
+    const b = c.secondary.summary?.finalValue;
     if (a === undefined || b === undefined) return null;
     if (a === b) return null;
     return a > b ? 'primary' : 'secondary';
@@ -204,9 +239,10 @@ export class SimulationResultsComponent {
    * Honors the same yearly/monthly toggle as the single-side table.
    */
   get comparisonRows(): ComparisonRow[] {
-    if (!this.comparison) return [];
-    const primary = this.comparison.primary.projections;
-    const secondary = this.comparison.secondary.projections;
+    const c = this.displayComparison;
+    if (!c) return [];
+    const primary = c.primary.projections;
+    const secondary = c.secondary.projections;
     if (!primary || !secondary) return [];
 
     const secondaryByKey = new Map<string, MonthProjection>();
@@ -240,6 +276,173 @@ export class SimulationResultsComponent {
     if (this.showMonthly) return rows;
     // Yearly view: keep December of each year, plus the final row regardless.
     return rows.filter((r, i) => r.month === 12 || i === rows.length - 1);
+  }
+
+  // ─── Inflation adjustment ("Today's €" toggle) ───────────────────────
+
+  /**
+   * When true, every euro number on screen is adjusted to today's
+   * purchasing power. State is owned by the page (so it can be encoded
+   * into the share URL and survive a reload). We mirror it in a local
+   * signal driven by setter/getter so template bindings stay reactive.
+   */
+  @Input() set realValues(v: boolean) {
+    this._showRealValues.set(v);
+  }
+  private readonly _showRealValues = signal(false);
+  readonly showRealValues = this._showRealValues.asReadonly();
+
+  /** Emitted when the user flips the toggle. Page picks this up to re-sync the URL. */
+  @Output() readonly realValuesChange = new EventEmitter<boolean>();
+
+  /**
+   * Annual inflation rate used for adjustments, in percent. 2.5% is a
+   * reasonable anchor — eurozone HICP has averaged ~2.0% since 1999, and
+   * 2.5% absorbs the recent above-target years. Hardcoded for v1; could
+   * be a dropdown in v2 (1% / 2% / 2.5% / 3%).
+   */
+  readonly inflationRate = signal(2.5);
+
+  /** Toggle the "Today's €" view. */
+  toggleRealValues(): void {
+    const next = !this._showRealValues();
+    this._showRealValues.set(next);
+    this.realValuesChange.emit(next);
+  }
+
+  // ─ Display getters: each one returns either the raw input (toggle OFF)
+  // ─ or an inflation-adjusted view (toggle ON). The template binds to
+  // ─ display* getters everywhere instead of the raw inputs.
+
+  get displaySummary(): SimulateSummary {
+    if (!this.showRealValues()) return this.summary;
+    return this.adjustSummary(this.summary);
+  }
+
+  get displayProjections(): MonthProjection[] {
+    if (!this.showRealValues()) return this.projections;
+    return this.projections.map(p => this.adjustProjection(p));
+  }
+
+  get displayDailyPoints(): DailyPoint[] {
+    if (!this.showRealValues()) return this.dailyPoints;
+    const r = this.inflationRate();
+    return this.dailyPoints.map(p => {
+      const dec = isoDateToDecimal(p.date);
+      return {
+        date: p.date,
+        portfolioValue: nominalToReal(p.portfolioValue, dec, r),
+        totalContributed: nominalToReal(p.totalContributed, dec, r),
+      };
+    });
+  }
+
+  /** Returns inflation-adjusted version of comparison.primary/secondary. */
+  get displayComparison(): ComparisonResult | null {
+    const c = this.comparison;
+    if (!c || !this.showRealValues()) return c;
+    return {
+      primary: this.adjustComparisonSide(c.primary),
+      secondary: this.adjustComparisonSide(c.secondary),
+    };
+  }
+
+  private adjustComparisonSide(side: ComparisonSide): ComparisonSide {
+    if (!side.summary || !side.projections) return side;
+    return {
+      ...side,
+      summary: this.adjustSummary(side.summary),
+      projections: side.projections.map(p => this.adjustProjection(p)),
+      dailyPoints: side.dailyPoints?.map(p => {
+        const dec = isoDateToDecimal(p.date);
+        const r = this.inflationRate();
+        return {
+          date: p.date,
+          portfolioValue: nominalToReal(p.portfolioValue, dec, r),
+          totalContributed: nominalToReal(p.totalContributed, dec, r),
+        };
+      }),
+    };
+  }
+
+  private adjustProjection(p: MonthProjection): MonthProjection {
+    const r = this.inflationRate();
+    const dec = yearMonthToDecimal(p.year, p.month);
+    return {
+      ...p,
+      portfolioValue: nominalToReal(p.portfolioValue, dec, r),
+      totalContributed: nominalToReal(p.totalContributed, dec, r),
+      pessimisticValue:
+        p.pessimisticValue !== undefined ? nominalToReal(p.pessimisticValue, dec, r) : undefined,
+      optimisticValue:
+        p.optimisticValue !== undefined ? nominalToReal(p.optimisticValue, dec, r) : undefined,
+    };
+  }
+
+  /**
+   * Adjust a summary in-place semantically: end-of-period values use the
+   * end-date factor; cumulative contributed uses the mid-period factor;
+   * gains and percentages are recomputed from the adjusted values; the
+   * annualized return uses the Fisher equation.
+   */
+  private adjustSummary(s: SimulateSummary): SimulateSummary {
+    const r = this.inflationRate();
+    const projections = this.projections.length > 0 ? this.projections : null;
+    if (!projections) return s;
+
+    const startMonth = projections[0];
+    const endMonth = projections[projections.length - 1];
+    const endDec = yearMonthToDecimal(endMonth.year, endMonth.month);
+
+    const finalValue = nominalToReal(s.finalValue, endDec, r);
+    const totalContributed = realCumulativeContributed(
+      s.totalContributed,
+      startMonth.year,
+      startMonth.month,
+      endMonth.year,
+      endMonth.month,
+      r
+    );
+    const totalGain = finalValue - totalContributed;
+    const percentageGain =
+      totalContributed > 0 ? Math.round((totalGain / totalContributed) * 1000) / 10 : 0;
+
+    const pessimisticValue =
+      s.pessimisticValue !== undefined ? nominalToReal(s.pessimisticValue, endDec, r) : undefined;
+    const optimisticValue =
+      s.optimisticValue !== undefined ? nominalToReal(s.optimisticValue, endDec, r) : undefined;
+    const pessimisticGain =
+      pessimisticValue !== undefined ? pessimisticValue - totalContributed : undefined;
+    const optimisticGain =
+      optimisticValue !== undefined ? optimisticValue - totalContributed : undefined;
+    const pessimisticPercent =
+      pessimisticGain !== undefined && totalContributed > 0
+        ? Math.round((pessimisticGain / totalContributed) * 1000) / 10
+        : undefined;
+    const optimisticPercent =
+      optimisticGain !== undefined && totalContributed > 0
+        ? Math.round((optimisticGain / totalContributed) * 1000) / 10
+        : undefined;
+
+    const annualizedReturn =
+      s.annualizedReturn !== undefined
+        ? Math.round(realAnnualizedReturn(s.annualizedReturn, r) * 10) / 10
+        : undefined;
+
+    return {
+      ...s,
+      finalValue,
+      totalContributed,
+      totalGain,
+      percentageGain,
+      pessimisticValue,
+      optimisticValue,
+      pessimisticGain,
+      optimisticGain,
+      pessimisticPercent,
+      optimisticPercent,
+      annualizedReturn,
+    };
   }
 
   // ─── Share button + toast ────────────────────────────────────────────

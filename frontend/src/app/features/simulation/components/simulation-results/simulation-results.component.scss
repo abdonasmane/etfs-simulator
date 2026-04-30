@@ -6,13 +6,19 @@
 }
 
 // ─────────────────────────────────────────────
-// Share button — top-right of the result area
+// Toolbar (Real-€ toggle + Share) — top-right of the result area
 // ─────────────────────────────────────────────
-.share-btn {
+.results-toolbar {
   position: absolute;
   top: 0.75rem;
   right: 0.75rem;
   z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+%toolbar-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -31,6 +37,18 @@
     border-color 0.15s ease,
     transform 0.15s ease;
 
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.share-btn {
+  @extend %toolbar-pill;
+
   &:hover {
     color: var(--color-accent);
     border-color: var(--color-accent);
@@ -38,16 +56,6 @@
     transform: translateY(-1px);
   }
 
-  &:active {
-    transform: translateY(0);
-  }
-
-  svg {
-    flex-shrink: 0;
-  }
-
-  // On narrow screens, drop the label and keep just the icon — the hero
-  // titles can otherwise crowd the button.
   @media (max-width: 480px) {
     span {
       display: none;
@@ -56,6 +64,66 @@
     width: 30px;
     height: 30px;
     justify-content: center;
+  }
+}
+
+// "Today's €" toggle — outline when off, filled-success when on so it reads
+// as an obvious state change at a glance.
+.real-toggle {
+  @extend %toolbar-pill;
+
+  &:hover:not(.active) {
+    color: var(--color-success);
+    border-color: var(--color-success);
+    background: var(--color-success-light);
+    transform: translateY(-1px);
+  }
+
+  &.active {
+    background: var(--color-success);
+    border-color: var(--color-success);
+    color: white;
+
+    &:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+  }
+
+  @media (max-width: 480px) {
+    span {
+      display: none;
+    }
+    padding: 0.4rem;
+    width: 30px;
+    height: 30px;
+    justify-content: center;
+  }
+}
+
+// Subtle subtitle that appears under the hero value when the toggle is ON,
+// so users always know which units they're looking at.
+.real-indicator {
+  margin: 0.35rem auto 0.5rem;
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  padding: 0.15rem 0.55rem;
+  border-radius: 100px;
+  letter-spacing: 0.005em;
+  animation: realFadeIn 0.18s ease-out;
+}
+
+@keyframes realFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -161,12 +229,6 @@
     border-radius: var(--radius-sm);
     display: inline-block;
     font-weight: 500;
-
-    &::before {
-      content: '~';
-      margin-right: 0.15rem;
-      opacity: 0.5;
-    }
   }
 
   .hero-label {
@@ -885,12 +947,33 @@ table {
     }
   }
 
-  .value-cell {
+  // Cell-level color overrides — selectors include `tbody td` so they have
+  // higher specificity than the base `tbody td { color: ... }` rule above.
+  // Without `tbody td.X`, Angular view-encapsulation attributes equalize the
+  // `_ngcontent` count and the more-deeply-nested element selector wins,
+  // so plain `.value-cell` would silently lose. Belt-and-suspenders.
+  tbody td.value-cell {
     font-weight: 600;
     color: var(--color-text-primary);
   }
 
-  .gain-cell {
+  // Mark when this row's portfolio value DROPPED vs the previous displayed
+  // row. Subtle: red TEXT, not a full red row — the cumulative gain is still
+  // green (you haven't actually lost money in absolute terms; just had a down
+  // period), so screaming red would over-correct.
+  tbody td.value-cell--drop {
+    color: var(--color-error);
+
+    .drop-arrow {
+      display: inline-block;
+      font-size: 0.65rem;
+      margin-right: 0.25rem;
+      transform: translateY(-1px);
+      opacity: 0.85;
+    }
+  }
+
+  tbody td.gain-cell {
     color: var(--color-success);
     font-weight: 500;
   }
@@ -900,12 +983,27 @@ table {
 // Compare table — value/gain stacked, winner highlight, Δ column
 // ─────────────────────────────────────────────
 .compare-table {
-  .value-cell {
+  // Same `tbody td.X` specificity-bump as the single-side table — see the
+  // comment there for the Angular VE rationale.
+  tbody td.value-cell {
     font-weight: 600;
     color: var(--color-text-primary);
     line-height: 1.25;
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+  }
+
+  // Drop highlight per side (independent of which side is winning).
+  tbody td.value-cell--drop {
+    color: var(--color-error);
+
+    .drop-arrow {
+      display: inline-block;
+      font-size: 0.65rem;
+      margin-right: 0.25rem;
+      transform: translateY(-1px);
+      opacity: 0.85;
+    }
   }
 
   .cell-gain {

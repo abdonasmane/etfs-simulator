@@ -1,31 +1,63 @@
 <div class="simulation-results">
-  <button
-    type="button"
-    class="share-btn"
-    (click)="share()"
-    aria-label="Share this simulation"
-    title="Share this simulation"
-  >
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+  <div class="results-toolbar">
+    <button
+      type="button"
+      class="real-toggle"
+      [class.active]="showRealValues()"
+      (click)="toggleRealValues()"
+      [attr.aria-pressed]="showRealValues()"
+      [title]="
+        showRealValues()
+          ? 'Showing values in today\'s purchasing power. Tap to switch back.'
+          : 'Adjust every euro on screen for ' +
+            inflationRate() +
+            '%/year inflation. See what your future / past money is actually worth in today\'s terms.'
+      "
     >
-      <circle cx="18" cy="5" r="3"></circle>
-      <circle cx="6" cy="12" r="3"></circle>
-      <circle cx="18" cy="19" r="3"></circle>
-      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-    </svg>
-    <span>Share</span>
-  </button>
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <line x1="12" y1="1" x2="12" y2="23"></line>
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+      <span>{{ showRealValues() ? "Today's €" : "Show today's €" }}</span>
+    </button>
 
-  @if (comparison) {
+    <button
+      type="button"
+      class="share-btn"
+      (click)="share()"
+      aria-label="Share this simulation"
+      title="Share this simulation"
+    >
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+      </svg>
+      <span>Share</span>
+    </button>
+  </div>
+
+  @if (displayComparison) {
     <div class="compare-hero fade-in">
       <div class="compare-hero-label">
         <span class="hero-historical-badge">Head-to-Head · Real Historical Data</span>
@@ -33,8 +65,8 @@
       <div class="compare-hero-sublabel">
         Same plan, different ETFs · since
         {{
-          comparison.primary.summary?.historicalStartDate ??
-            comparison.secondary.summary?.historicalStartDate
+          displayComparison.primary.summary?.historicalStartDate ??
+            displayComparison.secondary.summary?.historicalStartDate
         }}
       </div>
 
@@ -43,35 +75,40 @@
         <div
           class="compare-card"
           [class.compare-card--winner]="winningSide === 'primary'"
-          [class.compare-card--errored]="!comparison.primary.summary"
+          [class.compare-card--errored]="!displayComparison.primary.summary"
         >
           <div class="compare-card-header">
-            <span class="compare-symbol">{{ comparison.primary.symbol }}</span>
+            <span class="compare-symbol">{{ displayComparison.primary.symbol }}</span>
             @if (winningSide === 'primary') {
               <span class="compare-winner-badge">Winner</span>
             }
           </div>
-          @if (comparison.primary.summary) {
+          @if (displayComparison.primary.summary) {
             <div class="compare-final-value">
-              {{ comparison.primary.summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+              {{
+                displayComparison.primary.summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0'
+              }}
             </div>
             <div class="compare-gain">
               <span class="compare-gain-amount positive">
-                +{{ comparison.primary.summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                +{{
+                  displayComparison.primary.summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0'
+                }}
               </span>
               <span class="compare-gain-percent">
-                (+{{ comparison.primary.summary.percentageGain | number: '1.1-1' }}%)
+                (+{{ displayComparison.primary.summary.percentageGain | number: '1.1-1' }}%)
               </span>
             </div>
-            @if (comparison.primary.summary.annualizedReturn !== undefined) {
+            @if (displayComparison.primary.summary.annualizedReturn !== undefined) {
               <div class="compare-annualized">
-                ~{{ comparison.primary.summary.annualizedReturn | number: '1.1-1' }}% annualized
+                ~{{ displayComparison.primary.summary.annualizedReturn | number: '1.1-1' }}%
+                annualized{{ showRealValues() ? ' (real)' : '' }}
               </div>
             }
           } @else {
             <div class="compare-error">
               Couldn't load data
-              <span class="compare-error-detail">{{ comparison.primary.error }}</span>
+              <span class="compare-error-detail">{{ displayComparison.primary.error }}</span>
             </div>
           }
         </div>
@@ -82,115 +119,143 @@
         <div
           class="compare-card"
           [class.compare-card--winner]="winningSide === 'secondary'"
-          [class.compare-card--errored]="!comparison.secondary.summary"
+          [class.compare-card--errored]="!displayComparison.secondary.summary"
         >
           <div class="compare-card-header">
-            <span class="compare-symbol secondary">{{ comparison.secondary.symbol }}</span>
+            <span class="compare-symbol secondary">{{ displayComparison.secondary.symbol }}</span>
             @if (winningSide === 'secondary') {
               <span class="compare-winner-badge">Winner</span>
             }
           </div>
-          @if (comparison.secondary.summary) {
+          @if (displayComparison.secondary.summary) {
             <div class="compare-final-value">
-              {{ comparison.secondary.summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+              {{
+                displayComparison.secondary.summary.finalValue
+                  | currency: 'EUR' : 'symbol' : '1.0-0'
+              }}
             </div>
             <div class="compare-gain">
               <span class="compare-gain-amount positive">
-                +{{ comparison.secondary.summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                +{{
+                  displayComparison.secondary.summary.totalGain
+                    | currency: 'EUR' : 'symbol' : '1.0-0'
+                }}
               </span>
               <span class="compare-gain-percent">
-                (+{{ comparison.secondary.summary.percentageGain | number: '1.1-1' }}%)
+                (+{{ displayComparison.secondary.summary.percentageGain | number: '1.1-1' }}%)
               </span>
             </div>
-            @if (comparison.secondary.summary.annualizedReturn !== undefined) {
+            @if (displayComparison.secondary.summary.annualizedReturn !== undefined) {
               <div class="compare-annualized">
-                ~{{ comparison.secondary.summary.annualizedReturn | number: '1.1-1' }}% annualized
+                ~{{ displayComparison.secondary.summary.annualizedReturn | number: '1.1-1' }}%
+                annualized{{ showRealValues() ? ' (real)' : '' }}
               </div>
             }
           } @else {
             <div class="compare-error">
               Couldn't load data
-              <span class="compare-error-detail">{{ comparison.secondary.error }}</span>
+              <span class="compare-error-detail">{{ displayComparison.secondary.error }}</span>
             </div>
           }
         </div>
       </div>
 
-      @if (winningSide === null && comparison.primary.summary && comparison.secondary.summary) {
+      @if (showRealValues()) {
+        <div class="real-indicator">
+          in today's purchasing power · adjusted for {{ inflationRate() | number: '1.1-1' }}%/yr
+        </div>
+      }
+
+      @if (
+        winningSide === null &&
+        displayComparison.primary.summary &&
+        displayComparison.secondary.summary
+      ) {
         <div class="compare-tie">It's a tie — both ended at the same final value.</div>
       }
     </div>
   } @else {
     <!-- Hero Result -->
     <div class="hero-result">
-      @if (summary.isHistorical) {
+      @if (displaySummary.isHistorical) {
         <div class="hero-label">
           <span class="hero-historical-badge">Real Historical Data</span>
         </div>
         <div class="hero-sublabel">
-          Your portfolio today · invested since {{ summary.historicalStartDate }}
+          Your portfolio today · invested since {{ displaySummary.historicalStartDate }}
         </div>
       } @else {
         <div class="hero-label">
-          @if (summary.hasRange) {
-            Expected Portfolio Value by {{ summary.targetDate }}
+          @if (displaySummary.hasRange) {
+            Expected Portfolio Value by {{ displaySummary.targetDate }}
           } @else {
-            Projected Portfolio Value by {{ summary.targetDate }}
+            Projected Portfolio Value by {{ displaySummary.targetDate }}
           }
         </div>
       }
 
-      <div class="hero-value">{{ summary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+      <div class="hero-value">
+        {{ displaySummary.finalValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+      </div>
+
+      @if (showRealValues()) {
+        <div class="real-indicator">
+          in today's purchasing power · adjusted for {{ inflationRate() | number: '1.1-1' }}%/yr
+        </div>
+      }
 
       @if (
-        !summary.isHistorical &&
-        summary.hasRange &&
-        summary.pessimisticValue &&
-        summary.optimisticValue
+        !displaySummary.isHistorical &&
+        displaySummary.hasRange &&
+        displaySummary.pessimisticValue &&
+        displaySummary.optimisticValue
       ) {
         <div class="hero-range">
           <span class="range-label">Historical range:</span>
           <span class="range-values">
-            {{ summary.pessimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            {{ displaySummary.pessimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
             <span class="range-divider">—</span>
-            {{ summary.optimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            {{ displaySummary.optimisticValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
           </span>
         </div>
       }
 
       <div class="hero-gain">
         <span class="gain-badge">
-          +{{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
-          <span class="gain-percent">(+{{ summary.percentageGain | number: '1.1-1' }}%)</span>
+          +{{ displaySummary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+          <span class="gain-percent"
+            >(+{{ displaySummary.percentageGain | number: '1.1-1' }}%)</span
+          >
         </span>
       </div>
 
-      @if (summary.isHistorical && summary.annualizedReturn !== undefined) {
+      @if (displaySummary.isHistorical && displaySummary.annualizedReturn !== undefined) {
         <div class="hero-annualized">
-          ~{{ summary.annualizedReturn | number: '1.1-1' }}% avg. annual return over
-          {{ summary.totalMonths / 12 | number: '1.0-0' }} years
+          ~{{ displaySummary.annualizedReturn | number: '1.1-1' }}%
+          {{ showRealValues() ? 'real' : 'avg.' }} annual return over
+          {{ displaySummary.totalMonths / 12 | number: '1.0-0' }} years
         </div>
       }
 
-      @if (!summary.isHistorical && !summary.hasRange) {
+      @if (!displaySummary.isHistorical && !displaySummary.hasRange) {
         <div class="custom-rate-notice">Using custom rate — no historical range available</div>
       }
     </div>
   }
 
   <!-- Portfolio Breakdown (when using custom portfolio) -->
-  @if (summary.portfolio && summary.portfolio.length > 1) {
+  @if (displaySummary.portfolio && displaySummary.portfolio.length > 1) {
     <div class="portfolio-breakdown">
       <div class="portfolio-header">
         <span class="portfolio-title">Your Portfolio Mix</span>
-        @if (summary.blendedMedianReturn) {
+        @if (displaySummary.blendedMedianReturn) {
           <span class="blended-return"
-            >~{{ summary.blendedMedianReturn | number: '1.1-1' }}% blended return</span
+            >~{{ displaySummary.blendedMedianReturn | number: '1.1-1' }}% blended return</span
           >
         }
       </div>
       <div class="portfolio-bar">
-        @for (etf of summary.portfolio; track etf.symbol) {
+        @for (etf of displaySummary.portfolio; track etf.symbol) {
           <div
             class="bar-segment"
             [style.width.%]="etf.weight"
@@ -200,7 +265,7 @@
         }
       </div>
       <div class="portfolio-legend">
-        @for (etf of summary.portfolio; track etf.symbol) {
+        @for (etf of displaySummary.portfolio; track etf.symbol) {
           <div class="legend-item">
             <span class="legend-color" [style.background]="getETFColor(etf.symbol)"></span>
             <span class="legend-name">{{ etf.name }}</span>
@@ -214,20 +279,20 @@
 
   <!-- Chart -->
   <app-growth-chart
-    [projections]="projections"
-    [dailyPoints]="dailyPoints"
-    [isHistorical]="summary.isHistorical ?? false"
+    [projections]="displayProjections"
+    [dailyPoints]="displayDailyPoints"
+    [isHistorical]="displaySummary.isHistorical ?? false"
     [primaryLabel]="primaryChartLabel"
     [compareSeries]="secondaryChartSeries"
   />
 
   <!-- Summary Stats — hidden in compare mode (the dual cards above already show finals/gains) -->
-  @if (!comparison) {
+  @if (!displayComparison) {
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-content">
           <div class="stat-value">
-            {{ summary.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            {{ displaySummary.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}
           </div>
           <div class="stat-label">Total Contributed</div>
         </div>
@@ -236,12 +301,16 @@
       <div class="stat-card">
         <div class="stat-content">
           <div class="stat-value positive">
-            {{ summary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+            {{ displaySummary.totalGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
           </div>
-          @if (summary.hasRange && summary.pessimisticGain && summary.optimisticGain) {
+          @if (
+            displaySummary.hasRange &&
+            displaySummary.pessimisticGain &&
+            displaySummary.optimisticGain
+          ) {
             <div class="stat-range">
-              {{ summary.pessimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }} —
-              {{ summary.optimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
+              {{ displaySummary.pessimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }} —
+              {{ displaySummary.optimisticGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
             </div>
           }
           <div class="stat-label">Investment Returns</div>
@@ -250,22 +319,26 @@
 
       <div class="stat-card">
         <div class="stat-content">
-          <div class="stat-value">{{ summary.totalMonths / 12 | number: '1.1-1' }} years</div>
+          <div class="stat-value">
+            {{ displaySummary.totalMonths / 12 | number: '1.1-1' }} years
+          </div>
           <div class="stat-label">Investment Period</div>
         </div>
       </div>
 
       <div class="stat-card">
         <div class="stat-content">
-          <div class="stat-value positive">+{{ summary.percentageGain | number: '1.1-1' }}%</div>
+          <div class="stat-value positive">
+            +{{ displaySummary.percentageGain | number: '1.1-1' }}%
+          </div>
           @if (
-            summary.hasRange &&
-            summary.pessimisticPercent !== undefined &&
-            summary.optimisticPercent !== undefined
+            displaySummary.hasRange &&
+            displaySummary.pessimisticPercent !== undefined &&
+            displaySummary.optimisticPercent !== undefined
           ) {
             <div class="stat-range">
-              +{{ summary.pessimisticPercent | number: '1.1-1' }}% — +{{
-                summary.optimisticPercent | number: '1.1-1'
+              +{{ displaySummary.pessimisticPercent | number: '1.1-1' }}% — +{{
+                displaySummary.optimisticPercent | number: '1.1-1'
               }}%
             </div>
           }
@@ -275,7 +348,7 @@
     </div>
   }
 
-  <!-- Contribution Milestones -->
+  <!-- Contribution Milestones — always shown in nominal € (literal monthly amounts the user pays) -->
   @if (hasContributionGrowth) {
     <div class="milestones-section">
       <div
@@ -323,19 +396,19 @@
     </div>
 
     <div class="table-container">
-      @if (comparison && comparisonRows.length > 0) {
+      @if (displayComparison && comparisonRows.length > 0) {
         <table class="compare-table">
           <thead>
             <tr>
               <th>Date</th>
               <th class="align-right">Contributed</th>
-              <th class="align-right">{{ comparison.primary.symbol }}</th>
-              <th class="align-right">{{ comparison.secondary.symbol }}</th>
+              <th class="align-right">{{ displayComparison.primary.symbol }}</th>
+              <th class="align-right">{{ displayComparison.secondary.symbol }}</th>
               <th class="align-right">Δ</th>
             </tr>
           </thead>
           <tbody>
-            @for (row of comparisonRows; track row.year + '-' + row.month) {
+            @for (row of comparisonRows; track row.year + '-' + row.month; let i = $index) {
               <tr>
                 <td class="date-cell">
                   <span class="date-month">{{ getMonthName(row.month) }}</span>
@@ -347,8 +420,14 @@
                 <td
                   class="align-right value-cell"
                   [class.cell-winner]="row.rowWinner === 'primary'"
+                  [class.value-cell--drop]="isPrimaryDrop(i)"
                 >
-                  <div>{{ row.primaryValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+                  <div>
+                    @if (isPrimaryDrop(i)) {
+                      <span class="drop-arrow" aria-label="dropped">▼</span>
+                    }
+                    {{ row.primaryValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                  </div>
                   <div class="cell-gain">
                     +{{ row.primaryGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
                   </div>
@@ -356,8 +435,14 @@
                 <td
                   class="align-right value-cell"
                   [class.cell-winner]="row.rowWinner === 'secondary'"
+                  [class.value-cell--drop]="isSecondaryDrop(i)"
                 >
-                  <div>{{ row.secondaryValue | currency: 'EUR' : 'symbol' : '1.0-0' }}</div>
+                  <div>
+                    @if (isSecondaryDrop(i)) {
+                      <span class="drop-arrow" aria-label="dropped">▼</span>
+                    }
+                    {{ row.secondaryValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                  </div>
                   <div class="cell-gain">
                     +{{ row.secondaryGain | currency: 'EUR' : 'symbol' : '1.0-0' }}
                   </div>
@@ -365,13 +450,13 @@
                 <td class="align-right delta-cell">
                   @if (row.rowWinner === 'primary') {
                     <span class="delta-primary">
-                      {{ comparison.primary.symbol }} +{{
+                      {{ displayComparison.primary.symbol }} +{{
                         row.primaryValue - row.secondaryValue | currency: 'EUR' : 'symbol' : '1.0-0'
                       }}
                     </span>
                   } @else if (row.rowWinner === 'secondary') {
                     <span class="delta-secondary">
-                      {{ comparison.secondary.symbol }} +{{
+                      {{ displayComparison.secondary.symbol }} +{{
                         row.secondaryValue - row.primaryValue | currency: 'EUR' : 'symbol' : '1.0-0'
                       }}
                     </span>
@@ -396,7 +481,8 @@
           <tbody>
             @for (
               projection of displayedProjections;
-              track projection.year + '-' + projection.month
+              track projection.year + '-' + projection.month;
+              let i = $index
             ) {
               <tr>
                 <td class="date-cell">
@@ -406,7 +492,13 @@
                 <td class="align-right">
                   {{ projection.totalContributed | currency: 'EUR' : 'symbol' : '1.0-0' }}
                 </td>
-                <td class="align-right value-cell">
+                <td
+                  class="align-right value-cell"
+                  [class.value-cell--drop]="isProjectionDrop(i)"
+                >
+                  @if (isProjectionDrop(i)) {
+                    <span class="drop-arrow" aria-label="dropped">▼</span>
+                  }
                   {{ projection.portfolioValue | currency: 'EUR' : 'symbol' : '1.0-0' }}
                 </td>
                 <td class="align-right gain-cell">

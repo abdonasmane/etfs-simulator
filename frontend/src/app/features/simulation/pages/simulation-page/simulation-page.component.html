@@ -37,6 +37,8 @@
               [projections]="projections()"
               [dailyPoints]="dailyPoints()"
               [comparison]="comparison()"
+              [realValues]="showRealValues()"
+              (realValuesChange)="onRealValuesToggle($event)"
             />
           </div>
         </div>

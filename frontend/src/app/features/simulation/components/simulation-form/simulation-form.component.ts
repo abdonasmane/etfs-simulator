@@ -343,9 +343,14 @@ export class SimulationFormComponent implements OnInit {
    * Dropdown options for the comparison ETF. Excludes the primary selection
    * (no point comparing SPY vs SPY) and the special "Custom Portfolio" /
    * "Custom rate" entries (those don't yield real-data lines).
+   *
+   * Derives from `displayReturnOptions` (not the raw `returnOptions`) so the
+   * dynamically-injected hints — `~8.7% median (20yr rolling)` etc. computed
+   * from cached `IndexInfo` — show consistently for every ETF, not just the
+   * three that happen to have hardcoded hint strings.
    */
   get compareReturnOptions(): IndexOption[] {
-    return this.returnOptions.filter(
+    return this.displayReturnOptions.filter(
       o => o.value !== this.selectedReturnOption && o.value !== -1 && o.value !== -2
     );
   }
