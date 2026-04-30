@@ -8,6 +8,7 @@ import { ApiService } from '../../../../core/services';
 import {
   ComparisonResult,
   ComparisonSide,
+  DailyPoint,
   MonthProjection,
   SimulateHistoricalResponse,
   SimulateSummary,
@@ -57,6 +58,13 @@ export class SimulationPageComponent {
   readonly error = signal<string | null>(null);
   readonly summary = signal<SimulateSummary | null>(null);
   readonly projections = signal<MonthProjection[]>([]);
+  /**
+   * Daily portfolio snapshots from the historical endpoint, used to render
+   * the chart at full daily resolution. Empty for years/target modes (which
+   * don't fetch real prices) — chart falls back to monthly projections in
+   * those cases.
+   */
+  readonly dailyPoints = signal<DailyPoint[]>([]);
 
   /**
    * Side-by-side ETF-vs-ETF comparison result, set only when the user enabled
@@ -136,7 +144,11 @@ export class SimulationPageComponent {
         })
         .subscribe({
           next: response => {
-            this.updateResults(this.toHistoricalSummary(response), response.projections);
+            this.updateResults(
+              this.toHistoricalSummary(response),
+              response.projections,
+              response.dailyPoints
+            );
           },
           error: err => {
             this.error.set(err.message);
@@ -178,6 +190,7 @@ export class SimulationPageComponent {
             name: symbol,
             summary: this.toHistoricalSummary(response),
             projections: response.projections,
+            dailyPoints: response.dailyPoints,
           })
         ),
         catchError((err: Error) =>
@@ -210,6 +223,7 @@ export class SimulationPageComponent {
       if (winning.summary && winning.projections) {
         this.summary.set(winning.summary);
         this.projections.set(winning.projections);
+        this.dailyPoints.set(winning.dailyPoints ?? []);
       }
       this.error.set(null);
       this.resultKey.update(k => (k + 1) % 10000000);
@@ -239,12 +253,17 @@ export class SimulationPageComponent {
   /**
    * Update results with animation trigger. Clears any previous comparison
    * state so toggling compare off and re-running doesn't leave stale dual
-   * cards on screen.
+   * cards on screen. dailyPoints is optional — only present for What If runs.
    */
-  private updateResults(summary: SimulateSummary, projections: MonthProjection[]): void {
+  private updateResults(
+    summary: SimulateSummary,
+    projections: MonthProjection[],
+    dailyPoints: DailyPoint[] = []
+  ): void {
     this.comparison.set(null);
     this.summary.set(summary);
     this.projections.set(projections);
+    this.dailyPoints.set(dailyPoints);
     this.resultKey.update(k => (k + 1) % 10000000);
     this.loading.set(false);
   }

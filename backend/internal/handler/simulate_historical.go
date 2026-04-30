@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/abdonasmane/etfs-simulator/backend/sdk/errors"
@@ -45,6 +46,16 @@ type SimulateHistoricalRequest struct {
 	ContributionGrowthAmount *float64 `json:"contributionGrowthAmount,omitempty" example:"500"`
 }
 
+// DailyPoint is a single trading-day portfolio snapshot used to render the
+// What If chart at full daily resolution. Kept separate from MonthProjection
+// so the table/comparison views stay month-grained while the chart can show
+// every trading day's actual portfolio value (intra-month volatility).
+type DailyPoint struct {
+	Date             string  `json:"date" example:"2010-01-04"`
+	PortfolioValue   float64 `json:"portfolioValue" example:"1437.45"`
+	TotalContributed float64 `json:"totalContributed" example:"1500"`
+}
+
 // HistoricalSimulateSummary contains the actual results of a historical simulation.
 type HistoricalSimulateSummary struct {
 	StartDate                string                  `json:"startDate" example:"January 2010"`
@@ -64,6 +75,9 @@ type HistoricalSimulateSummary struct {
 type SimulateHistoricalResponse struct {
 	Inputs      SimulateHistoricalRequest `json:"inputs"`
 	Projections []MonthProjection         `json:"projections"`
+	// DailyPoints carries one snapshot per trading day for high-resolution
+	// chart rendering. Same simulation as Projections, just sampled per day.
+	DailyPoints []DailyPoint              `json:"dailyPoints"`
 	Summary     HistoricalSimulateSummary `json:"summary"`
 }
 
@@ -140,11 +154,12 @@ func (h *Handler) handleSimulateHistorical(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Fetch actual historical prices for all symbols. We pull a 12-month
-	// buffer before startDate so the baseline lookup can walk back through
-	// any Yahoo gaps (Yahoo's monthly bars for some LSE-listed ETFs — e.g.
-	// ISDU.L — are missing every October).
-	fetchStart := startDate.AddDate(-1, 0, 0)
+	// Fetch DAILY historical prices for all symbols. We pull a 30-day buffer
+	// before startDate so we have a baseline price even if startDate falls on
+	// a weekend/holiday. Daily bars give us intra-month volatility — a
+	// contribution that lands on day 1 of a month is properly exposed to that
+	// month's actual ups and downs, not just its end-of-month outcome.
+	fetchStart := startDate.AddDate(0, -1, 0)
 	pricesBySymbol := make(map[string]map[string]float64)
 
 	for _, symbol := range symbols {
@@ -158,14 +173,14 @@ func (h *Handler) handleSimulateHistorical(w http.ResponseWriter, r *http.Reques
 
 		priceMap := make(map[string]float64)
 		for _, p := range data.DataPoints {
-			key := p.Date.Format("2006-01")
+			key := p.Date.Format("2006-01-02")
 			priceMap[key] = p.AdjClose
 		}
 		pricesBySymbol[symbol] = priceMap
 	}
 
 	// Run historical simulation
-	projections, summary, simErr := runHistoricalSimulation(
+	projections, dailyPoints, summary, simErr := runHistoricalSimulation(
 		req.InitialInvestment,
 		req.MonthlyContribution,
 		startDate,
@@ -197,6 +212,7 @@ func (h *Handler) handleSimulateHistorical(w http.ResponseWriter, r *http.Reques
 	respondJSON(w, http.StatusOK, SimulateHistoricalResponse{
 		Inputs:      req,
 		Projections: projections,
+		DailyPoints: dailyPoints,
 		Summary:     summary,
 	})
 }
@@ -273,20 +289,27 @@ func (h *Handler) validateSymbolCoverage(symbols []string, startDate time.Time) 
 
 // --- Core Simulation Logic ---
 
-// runHistoricalSimulation replays actual monthly price returns from startDate
-// to endDate. Each month's return is derived from real adjusted-close prices
-// fetched from Yahoo Finance.
+// runHistoricalSimulation replays actual DAILY price returns from startDate
+// to endDate. Each trading day's return is derived from real adjusted-close
+// prices fetched from Yahoo Finance.
 //
-// Yahoo Finance's monthly bars are not perfectly contiguous — some LSE-listed
-// ETFs (e.g. ISDU.L) are systematically missing one month per year, and
-// occasional gaps exist for other ETFs too. To keep the simulation duration
-// faithful to what the user asked for, we carry the last known price forward
-// when a month is missing. The next real bar then captures the cumulative
-// return across the gap in one step, which is mathematically equivalent to
-// computing each missing month's contribution at the spot rate. The result:
-//   - every calendar month from startDate to endDate gets a projection,
-//   - cumulative returns match what the underlying prices say,
-//   - the user sees the duration they asked for, not a silently-clipped one.
+// Cadence model:
+//   - Walk every trading day Yahoo gives us (sorted union across all symbols).
+//     Daily price ratios compound naturally, so we capture intra-month
+//     volatility that an end-of-month-only model would smooth out.
+//   - Add the monthly contribution on the FIRST trading day of each calendar
+//     month. This matches the realistic DCA pattern (contributing early, then
+//     riding the month's moves) and means the contribution is exposed to that
+//     month's actual ups and downs.
+//   - Emit one MonthProjection per calendar month, snapshotted on the LAST
+//     trading day of that month. This keeps the response shape stable so the
+//     UI/chart/table don't change.
+//   - Stepwise yearly contribution bumps (€/year fixed mode) apply on the
+//     first trading day after each year anniversary.
+//   - Carry-forward semantics: if a symbol is missing a particular trading
+//     day (rare with daily data, but possible at bilateral holiday gaps),
+//     its contribution to that day's blended return is 0 and the move is
+//     caught at the next available bar.
 func runHistoricalSimulation(
 	initial, monthlyBase float64,
 	startDate, endDate time.Time,
@@ -294,18 +317,27 @@ func runHistoricalSimulation(
 	weights []float64,
 	pricesBySymbol map[string]map[string]float64,
 	contributionGrowth, contributionGrowthAmount float64,
-) ([]MonthProjection, HistoricalSimulateSummary, error) {
-	monthlyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/12.0) - 1
+) ([]MonthProjection, []DailyPoint, HistoricalSimulateSummary, error) {
+	// Convert annual % to a daily compound factor (252 trading days/year).
+	dailyContributionGrowth := math.Pow(1+contributionGrowth/100, 1.0/252.0) - 1
 
-	// Establish a baseline price for every symbol from the months immediately
-	// preceding startDate. Walks back up to 12 months to absorb a leading
-	// Yahoo gap (we already fetched a 12-month buffer in the handler).
+	// Build the master sorted list of trading days from the union of every
+	// symbol's day keys, restricted to startDate..endDate.
+	tradingDays := buildTradingDays(pricesBySymbol, startDate, endDate)
+	if len(tradingDays) == 0 {
+		return nil, nil, HistoricalSimulateSummary{}, errors.New(
+			"no trading-day data available for the specified period and symbols — " +
+				"the ETF may not have existed at that date")
+	}
+
+	// Establish a baseline price per symbol from the days immediately preceding
+	// startDate (we fetched a 30-day buffer for this).
 	lastKnownPrice := make(map[string]float64, len(symbols))
 	for _, symbol := range symbols {
-		baseline, ok := findBaselinePrice(pricesBySymbol[symbol], startDate)
+		baseline, ok := findBaselineDailyPrice(pricesBySymbol[symbol], startDate)
 		if !ok {
-			return nil, HistoricalSimulateSummary{}, errors.Errorf(
-				"no baseline price available for %s near %s", symbol, startDate.Format("January 2006"))
+			return nil, nil, HistoricalSimulateSummary{}, errors.Errorf(
+				"no baseline price available for %s near %s", symbol, startDate.Format("2006-01-02"))
 		}
 		lastKnownPrice[symbol] = baseline
 	}
@@ -314,26 +346,29 @@ func runHistoricalSimulation(
 	totalContributed := initial
 	currentContribution := monthlyBase
 	projections := make([]MonthProjection, 0)
-	monthIndex := 0
+	dailyPoints := make([]DailyPoint, 0, len(tradingDays))
 
-	for curDate := startDate; !curDate.After(endDate); curDate = curDate.AddDate(0, 1, 0) {
-		// At each year anniversary (months 12, 24, 36, …) bump the monthly
-		// contribution by the fixed yearly amount. The bump happens BEFORE
-		// recording, so all 12 months of the new year carry the new value.
-		if monthIndex > 0 && monthIndex%12 == 0 {
+	var prevYear int
+	var prevMonth time.Month
+	yearAnniversaryDate := startDate.AddDate(1, 0, 0) // next stepwise bump trigger
+	monthlyProj := monthSnapshot{} // running accumulator for end-of-month emit
+
+	for idx, day := range tradingDays {
+		// Stepwise yearly bump: when we cross a year anniversary, bump the
+		// monthly contribution. Compare with day at start of trading-day so
+		// the bump applies to all of the new year's contributions.
+		if !day.Before(yearAnniversaryDate) {
 			currentContribution += contributionGrowthAmount
+			yearAnniversaryDate = yearAnniversaryDate.AddDate(1, 0, 0)
 		}
 
-		curKey := curDate.Format("2006-01")
-
+		// Compute blended return for this trading day (carry-forward gaps).
 		var blendedReturn float64
+		dayKey := day.Format("2006-01-02")
 		for i, symbol := range symbols {
 			prevPrice := lastKnownPrice[symbol]
-			curPrice, hasCur := pricesBySymbol[symbol][curKey]
+			curPrice, hasCur := pricesBySymbol[symbol][dayKey]
 			if !hasCur || curPrice <= 0 {
-				// Yahoo gap — carry the last known price forward. This symbol
-				// contributes 0% to the blend this month; the move will be
-				// captured at the next available bar.
 				curPrice = prevPrice
 			} else {
 				lastKnownPrice[symbol] = curPrice
@@ -342,48 +377,134 @@ func runHistoricalSimulation(
 				blendedReturn += weights[i] * (curPrice/prevPrice - 1)
 			}
 		}
+		balance *= (1 + blendedReturn)
 
-		balance = balance*(1+blendedReturn) + currentContribution
-		totalContributed += currentContribution
+		// On the FIRST trading day of each calendar month, deposit the
+		// monthly contribution and reset the month accumulator.
+		isNewMonth := idx == 0 || day.Month() != prevMonth || day.Year() != prevYear
+		if isNewMonth {
+			// Emit the previous month's snapshot if there is one.
+			if idx > 0 {
+				projections = append(projections, monthlyProj.toProjection())
+			}
+			balance += currentContribution
+			totalContributed += currentContribution
 
-		projections = append(projections, MonthProjection{
-			Year:                curDate.Year(),
-			Month:               int(curDate.Month()),
-			MonthlyContribution: round2(currentContribution),
-			TotalContributed:    round2(totalContributed),
-			PortfolioValue:      round2(balance),
+			monthlyProj = monthSnapshot{
+				year:                day.Year(),
+				month:               int(day.Month()),
+				monthlyContribution: currentContribution,
+				totalContributed:    totalContributed,
+				portfolioValue:      balance,
+			}
+			prevYear = day.Year()
+			prevMonth = day.Month()
+		} else {
+			// Mid-month: just update the snapshot's running portfolio value.
+			monthlyProj.portfolioValue = balance
+		}
+
+		// Record this trading day's snapshot for high-resolution chart rendering.
+		dailyPoints = append(dailyPoints, DailyPoint{
+			Date:             dayKey,
+			PortfolioValue:   round2(balance),
+			TotalContributed: round2(totalContributed),
 		})
 
-		// Smooth percentage compounding for next month (no-op when rate is 0).
-		currentContribution *= (1 + monthlyContributionGrowth)
-		monthIndex++
+		// Smooth percentage daily compounding for next day (no-op when rate is 0).
+		currentContribution *= (1 + dailyContributionGrowth)
 	}
 
-	if len(projections) == 0 {
-		return nil, HistoricalSimulateSummary{}, errors.New(
-			"no historical data available for the specified period and symbols — " +
-				"the ETF may not have existed at that date")
-	}
+	// Flush the final month's snapshot.
+	projections = append(projections, monthlyProj.toProjection())
 
 	summary := buildHistoricalSummary(projections, startDate, endDate)
-	return projections, summary, nil
+	return projections, dailyPoints, summary, nil
 }
 
-// findBaselinePrice returns the most recent available adjusted close at or
-// before startDate-1mo, scanning back up to 12 months to absorb leading Yahoo
-// gaps. If even that fails it falls back to startDate's own bar (which yields
-// a 0% return on the first month — appropriate when the user's start date
-// coincides with the ETF's very first data point).
-func findBaselinePrice(prices map[string]float64, startDate time.Time) (float64, bool) {
-	candidate := startDate.AddDate(0, -1, 0)
-	for i := 0; i < 12; i++ {
-		if p, ok := prices[candidate.Format("2006-01")]; ok && p > 0 {
+// monthSnapshot holds the running state for the calendar month currently
+// being accumulated. We snapshot at end-of-month — the portfolio value
+// reflects all daily compounding through the last trading day of that month.
+type monthSnapshot struct {
+	year                int
+	month               int
+	monthlyContribution float64
+	totalContributed    float64
+	portfolioValue      float64
+}
+
+func (m monthSnapshot) toProjection() MonthProjection {
+	return MonthProjection{
+		Year:                m.year,
+		Month:               m.month,
+		MonthlyContribution: round2(m.monthlyContribution),
+		TotalContributed:    round2(m.totalContributed),
+		PortfolioValue:      round2(m.portfolioValue),
+	}
+}
+
+// buildTradingDays returns the sorted union of every symbol's available
+// trading-day keys, restricted to the [startDate, endDate] window. The
+// union (rather than intersection) means that a holiday at one exchange
+// doesn't strand the whole simulation; carry-forward inside the loop
+// handles the missing symbol.
+func buildTradingDays(pricesBySymbol map[string]map[string]float64, startDate, endDate time.Time) []time.Time {
+	seen := make(map[string]struct{})
+	for _, prices := range pricesBySymbol {
+		for k := range prices {
+			seen[k] = struct{}{}
+		}
+	}
+	startKey := startDate.Format("2006-01-02")
+	endKey := endDate.Format("2006-01-02")
+	keys := make([]string, 0, len(seen))
+	for k := range seen {
+		if k >= startKey && k <= endKey {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	out := make([]time.Time, 0, len(keys))
+	for _, k := range keys {
+		t, err := time.Parse("2006-01-02", k)
+		if errors.Check(err) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out
+}
+
+// findBaselineDailyPrice returns the best available adjusted close to use
+// as the "previous day" baseline at the start of the simulation.
+//
+// Lookup order:
+//  1. Walk BACKWARD up to 60 calendar days from startDate. This handles the
+//     common cases — startDate falling on a weekend or holiday, or just
+//     anchoring to the prior trading day so the first day's return reflects
+//     a real price move.
+//  2. If nothing earlier exists, walk FORWARD up to 60 calendar days. This
+//     handles the edge case where the user picks the very first month of an
+//     ETF's history (e.g. IGDA.L and Jan 2022) — there's no "before" data
+//     because the ETF didn't exist yet, so we anchor to the FIRST available
+//     trading day instead. The result: the first iteration's return is 0%
+//     (price/price - 1) and the simulation effectively starts from that
+//     first available day, which matches "you couldn't have invested earlier
+//     because the ETF didn't trade yet".
+func findBaselineDailyPrice(prices map[string]float64, startDate time.Time) (float64, bool) {
+	candidate := startDate.AddDate(0, 0, -1)
+	for range 60 {
+		if p, ok := prices[candidate.Format("2006-01-02")]; ok && p > 0 {
 			return p, true
 		}
-		candidate = candidate.AddDate(0, -1, 0)
+		candidate = candidate.AddDate(0, 0, -1)
 	}
-	if p, ok := prices[startDate.Format("2006-01")]; ok && p > 0 {
-		return p, true
+	candidate = startDate
+	for range 60 {
+		if p, ok := prices[candidate.Format("2006-01-02")]; ok && p > 0 {
+			return p, true
+		}
+		candidate = candidate.AddDate(0, 0, 1)
 	}
 	return 0, false
 }

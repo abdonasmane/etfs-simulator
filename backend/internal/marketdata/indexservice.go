@@ -24,9 +24,14 @@ type IndexInfo struct {
 	// machine-readable form so the historical-simulation handler and the
 	// frontend year picker can validate user-supplied start dates without
 	// re-parsing the formatted DataStartDate string.
-	DataStartYear      int `json:"dataStartYear"`
-	DataStartMonth     int `json:"dataStartMonth"`
-	RollingPeriodYears int `json:"rollingPeriodYears"` // e.g., 10 or 20 years
+	DataStartYear     int `json:"dataStartYear"`
+	DataStartMonth    int `json:"dataStartMonth"`
+	RollingPeriodYears int `json:"rollingPeriodYears"` // 20, 10, or 5 — the window actually used
+	// LimitedHistory is true when we had to fall back below the standard 10y
+	// rolling window (i.e., the symbol launched recently). Statistical
+	// projections for these are weaker — the frontend can de-emphasize them
+	// or tag them as "best for What If" to set expectations.
+	LimitedHistory bool `json:"limitedHistory"`
 }
 
 // SupportedIndex defines a supported index with its ETF symbol.
@@ -114,37 +119,58 @@ func (s *IndexService) Initialize() error {
 }
 
 // fetchAndCalculate fetches data from Yahoo and calculates statistics.
+//
+// Rolling-window fallback ladder: 20y → 10y → 5y → 3y. Below 3y we still
+// cache the symbol's metadata (so the What If date picker can constrain the
+// start date) but with RollingPeriodYears=0 — a sentinel meaning "no
+// statistical projection possible". The years/target handlers reject these
+// with a friendly "use What If instead" message; the historical handler
+// uses live Yahoo prices and works regardless.
+//
+// 3y is the minimum we'll trust because IGDA-class symbols (recent UCITS
+// launches) need to be usable; the percentile bands are wide and explicitly
+// flagged as LimitedHistory so the UI can warn users.
 func (s *IndexService) fetchAndCalculate(idx SupportedIndex) (*IndexInfo, error) {
 	data, err := s.client.FetchHistoricalData(idx.Symbol, "1mo", "max")
 	if errors.Check(err) {
 		return nil, errors.Wrap(err, "fetching historical data")
 	}
-
-	// Try 20-year rolling first, fall back to 10-year if not enough data
-	rollingYears := 20
-	stats, err := s.client.CalculateStats(data, rollingYears)
-	if errors.Check(err) {
-		rollingYears = 10
-		stats, err = s.client.CalculateStats(data, rollingYears)
-		if errors.Check(err) {
-			return nil, errors.Wrap(err, "calculating statistics")
-		}
+	if len(data.DataPoints) == 0 {
+		return nil, errors.Errorf("no data points returned for %s", idx.Symbol)
 	}
 
-	return &IndexInfo{
-		Symbol:             idx.Symbol,
-		Name:               idx.Name,
-		Description:        idx.Description,
-		MedianReturn:       roundTo2Decimals(stats.AnnualizedReturn),
-		PessimisticReturn:  roundTo2Decimals(stats.Percentile5Return),
-		OptimisticReturn:   roundTo2Decimals(stats.Percentile95Return),
-		StandardDeviation:  roundTo2Decimals(stats.StandardDeviation),
-		DataYears:          roundTo1Decimal(stats.TotalYears),
-		DataStartDate:      stats.DataStartDate.Format("Jan 2006"),
-		DataStartYear:      stats.DataStartDate.Year(),
-		DataStartMonth:     int(stats.DataStartDate.Month()),
-		RollingPeriodYears: rollingYears,
-	}, nil
+	first := data.DataPoints[0].Date
+	last := data.DataPoints[len(data.DataPoints)-1].Date
+	totalYears := last.Sub(first).Hours() / (24 * 365.25)
+
+	info := &IndexInfo{
+		Symbol:         idx.Symbol,
+		Name:           idx.Name,
+		Description:    idx.Description,
+		DataYears:      roundTo1Decimal(totalYears),
+		DataStartDate:  first.Format("Jan 2006"),
+		DataStartYear:  first.Year(),
+		DataStartMonth: int(first.Month()),
+	}
+
+	for _, candidate := range []int{20, 10, 5, 3} {
+		stats, statsErr := s.client.CalculateStats(data, candidate)
+		if statsErr != nil {
+			continue
+		}
+		info.MedianReturn = roundTo2Decimals(stats.AnnualizedReturn)
+		info.PessimisticReturn = roundTo2Decimals(stats.Percentile5Return)
+		info.OptimisticReturn = roundTo2Decimals(stats.Percentile95Return)
+		info.StandardDeviation = roundTo2Decimals(stats.StandardDeviation)
+		info.DataYears = roundTo1Decimal(stats.TotalYears) // refine using stats span
+		info.RollingPeriodYears = candidate
+		info.LimitedHistory = candidate < 10
+		return info, nil
+	}
+
+	// Cached without stats — picker still works, statistical projections refused.
+	info.LimitedHistory = true
+	return info, nil
 }
 
 // GetIndex returns cached index info for a symbol.

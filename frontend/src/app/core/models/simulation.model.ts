@@ -275,11 +275,24 @@ export interface HistoricalSimulateSummary {
 }
 
 /**
+ * Single trading-day portfolio snapshot for high-resolution chart rendering.
+ * Cheap shape — date + portfolio value + cumulative contribution. Complements
+ * MonthProjection (which the table/comparison views still use).
+ */
+export interface DailyPoint {
+  /** YYYY-MM-DD trading date. */
+  date: string;
+  portfolioValue: number;
+  totalContributed: number;
+}
+
+/**
  * Response for a historical simulation.
  */
 export interface SimulateHistoricalResponse {
   inputs: SimulateHistoricalRequest;
   projections: MonthProjection[];
+  dailyPoints: DailyPoint[];
   summary: HistoricalSimulateSummary;
 }
 
@@ -302,6 +315,9 @@ export interface ComparisonSide {
 
   /** Successful projections, or undefined when the fetch failed. */
   projections?: MonthProjection[];
+
+  /** High-resolution daily portfolio points for the chart. Optional. */
+  dailyPoints?: DailyPoint[];
 
   /** Backend error message when the fetch failed for this side. */
   error?: string;

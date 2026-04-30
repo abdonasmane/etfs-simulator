@@ -218,6 +218,13 @@ func (h *Handler) handleSimulateByYears(w http.ResponseWriter, r *http.Request) 
 			respondError(w, http.StatusBadRequest, "unknown index symbol: "+*req.IndexSymbol)
 			return
 		}
+		if info.RollingPeriodYears == 0 {
+			respondError(w, http.StatusBadRequest,
+				*req.IndexSymbol+" has too little history ("+info.DataStartDate+
+					" — under 3 years) for statistical projections. "+
+					"Use What If mode to replay its actual price history.")
+			return
+		}
 		indexInfo = &indexReturnRates{
 			median:      info.MedianReturn,
 			pessimistic: info.PessimisticReturn,
@@ -384,6 +391,13 @@ func (h *Handler) handleSimulateByTarget(w http.ResponseWriter, r *http.Request)
 		info, ok := h.indexService.GetIndex(*req.IndexSymbol)
 		if !ok {
 			respondError(w, http.StatusBadRequest, "unknown index symbol: "+*req.IndexSymbol)
+			return
+		}
+		if info.RollingPeriodYears == 0 {
+			respondError(w, http.StatusBadRequest,
+				*req.IndexSymbol+" has too little history ("+info.DataStartDate+
+					" — under 3 years) for statistical projections. "+
+					"Use What If mode to replay its actual price history.")
 			return
 		}
 		indexInfo = &indexReturnRates{

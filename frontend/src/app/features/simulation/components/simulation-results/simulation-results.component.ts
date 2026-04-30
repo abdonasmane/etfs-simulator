@@ -5,6 +5,7 @@ import { trigger, transition, style, animate } from '@angular/animations';
 import {
   ComparisonResult,
   ComparisonSide,
+  DailyPoint,
   MonthProjection,
   SimulateSummary,
 } from '../../../../core/models';
@@ -37,6 +38,13 @@ import { CompareSeries, GrowthChartComponent } from '../growth-chart/growth-char
 export class SimulationResultsComponent {
   @Input({ required: true }) summary!: SimulateSummary;
   @Input({ required: true }) projections!: MonthProjection[];
+
+  /**
+   * High-resolution daily portfolio snapshots. When non-empty (What If mode),
+   * the chart renders one point per trading day. When empty (years/target),
+   * the chart falls back to the monthly projections.
+   */
+  @Input() dailyPoints: DailyPoint[] = [];
 
   /**
    * When set, renders the dual-card "ETF A vs ETF B" comparison layout
@@ -144,6 +152,8 @@ export class SimulationResultsComponent {
    * Chart input for the secondary line. Returns null when not comparing or
    * when the secondary side has no data (errored). The chart in that case
    * falls back to single-line rendering of whichever side did succeed.
+   * Includes dailyPoints when available so the secondary line also renders
+   * at full daily resolution.
    */
   get secondaryChartSeries(): CompareSeries | null {
     if (!this.comparison) return null;
@@ -152,7 +162,11 @@ export class SimulationResultsComponent {
     // the primary line on the chart — no compare overlay needed.
     if (!primary.summary || !primary.projections) return null;
     if (!secondary.summary || !secondary.projections) return null;
-    return { label: secondary.symbol, projections: secondary.projections };
+    return {
+      label: secondary.symbol,
+      projections: secondary.projections,
+      dailyPoints: secondary.dailyPoints,
+    };
   }
 
   /**

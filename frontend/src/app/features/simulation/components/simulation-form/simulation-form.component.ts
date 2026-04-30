@@ -206,6 +206,44 @@ export class SimulationFormComponent {
     return option?.symbol;
   }
 
+  /**
+   * Return options shown to the user, mode-filtered. In years/target modes
+   * we hide symbols whose backend `rollingPeriodYears === 0` (no statistical
+   * stats available — backend would reject them) and tag any with
+   * `limitedHistory: true` (5y rolling) with a "(limited history)" hint so
+   * the user knows the percentile band is wider/less reliable. In What If
+   * mode we show everything since the simulation uses live prices.
+   */
+  get displayReturnOptions(): IndexOption[] {
+    const isStatistical = this.mode !== 'whatif';
+    return this.returnOptions
+      .filter(opt => {
+        if (!opt.symbol) return true; // Custom Portfolio / Custom rate sentinels
+        const info = this.indexInfoBySymbol.get(opt.symbol);
+        if (!info) return true; // metadata not yet loaded — keep it visible
+        if (isStatistical && info.rollingPeriodYears === 0) return false;
+        return true;
+      })
+      .map(opt => {
+        if (!opt.symbol) return opt;
+        const info = this.indexInfoBySymbol.get(opt.symbol);
+        if (!info) return opt;
+        if (isStatistical && info.limitedHistory && info.rollingPeriodYears > 0) {
+          return {
+            ...opt,
+            hint: `${info.medianReturn}% median · ${info.rollingPeriodYears}yr (limited)`,
+          };
+        }
+        if (info.medianReturn > 0 && !opt.hint) {
+          return {
+            ...opt,
+            hint: `~${info.medianReturn}% median (${info.rollingPeriodYears}yr rolling)`,
+          };
+        }
+        return opt;
+      });
+  }
+
   /** Symbol of the second ETF picked for comparison, or undefined if off. */
   get selectedCompareIndexSymbol(): string | undefined {
     if (this.selectedCompareReturnOption === null) return undefined;
@@ -260,6 +298,13 @@ export class SimulationFormComponent {
     this.mode = mode;
     if (mode !== 'whatif') {
       this.selectedCompareReturnOption = null;
+      // If the currently picked ETF lacks statistical history, snap to S&P 500
+      // (value 1). Years/target modes can't render that ETF.
+      const sym = this.selectedIndexSymbol;
+      const info = sym ? this.indexInfoBySymbol.get(sym) : undefined;
+      if (info && info.rollingPeriodYears === 0) {
+        this.selectedReturnOption = 1;
+      }
     }
   }
 

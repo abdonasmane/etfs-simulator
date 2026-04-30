@@ -94,6 +94,47 @@ func PointsPerYear(interval string) int {
 	}
 }
 
+// inferPointsPerYear computes the actual number of points per year from the
+// median timestamp spacing. Used as a defense against Yahoo silently
+// downgrading the interval for newer or thinly-traded symbols (e.g. it returns
+// weekly bars when we ask for `1mo` on IGDA.L). Trusting `data.Interval` here
+// would lead to silent statistical errors — actual spacing is the source of
+// truth.
+func inferPointsPerYear(points []PricePoint) int {
+	if len(points) < 3 {
+		return 12 // Not enough data to infer; fall back to monthly heuristic.
+	}
+	gaps := make([]float64, 0, len(points)-1)
+	for i := 1; i < len(points); i++ {
+		dt := points[i].Date.Sub(points[i-1].Date).Seconds()
+		if dt > 0 {
+			gaps = append(gaps, dt)
+		}
+	}
+	if len(gaps) == 0 {
+		return 12
+	}
+	sort.Float64s(gaps)
+	median := gaps[len(gaps)/2]
+	const secondsPerYear = 365.25 * 24 * 3600
+	per := int(math.Round(secondsPerYear / median))
+	// Clamp to plausible buckets so noise doesn't yield absurd values.
+	switch {
+	case per >= 200:
+		return 252 // daily
+	case per >= 40:
+		return 52 // weekly
+	case per >= 20:
+		return 26 // semi-monthly (rare)
+	case per >= 8:
+		return 12 // monthly
+	case per >= 3:
+		return 4 // quarterly
+	default:
+		return 1 // annual or sparser
+	}
+}
+
 // IndexStats contains statistical analysis of historical returns.
 type IndexStats struct {
 	Symbol             string
@@ -114,12 +155,14 @@ func (c *YahooClient) FetchHistoricalData(symbol, interval, rangePeriod string) 
 	return c.fetchFromURL(symbol, interval, url)
 }
 
-// FetchHistoricalDataByPeriod fetches historical monthly data for a symbol between two specific dates.
-// This is used for "what if" historical simulations using real past price data.
+// FetchHistoricalDataByPeriod fetches historical DAILY price data for a symbol
+// between two specific dates. Used by the What If historical simulation for
+// real intra-month volatility — daily bars capture mid-month moves that
+// monthly snapshots smooth out, which matters for DCA timing exposure.
 func (c *YahooClient) FetchHistoricalDataByPeriod(symbol string, startTime, endTime time.Time) (*HistoricalData, error) {
-	url := fmt.Sprintf("%s/%s?interval=1mo&period1=%d&period2=%d",
+	url := fmt.Sprintf("%s/%s?interval=1d&period1=%d&period2=%d",
 		c.baseURL, symbol, startTime.Unix(), endTime.Unix())
-	return c.fetchFromURL(symbol, "1mo", url)
+	return c.fetchFromURL(symbol, "1d", url)
 }
 
 // fetchFromURL performs the actual HTTP fetch and parses the Yahoo Finance response.
@@ -210,13 +253,19 @@ func (c *YahooClient) fetchFromURL(symbol, interval, url string) (*HistoricalDat
 
 // CalculateStats computes statistical analysis from historical data.
 // rollingYears specifies the rolling period for calculating returns (e.g., 20 for 20-year returns).
+//
+// pointsPerYear is inferred from actual timestamp spacing rather than the
+// requested interval string — Yahoo silently returns weekly bars for some
+// newer/thin symbols when we ask for monthly, and trusting the interval
+// label there leads to silently wrong statistics (e.g. a 4-year-old ETF
+// being reported as having 18 years of monthly history).
 func (c *YahooClient) CalculateStats(data *HistoricalData, rollingYears int) (*IndexStats, error) {
-	pointsPerYear := PointsPerYear(data.Interval)
+	pointsPerYear := inferPointsPerYear(data.DataPoints)
 	requiredPoints := pointsPerYear * rollingYears
 
 	if len(data.DataPoints) < requiredPoints {
-		return nil, errors.Errorf("insufficient data: need at least %d data points (%d years of %s data), got %d",
-			requiredPoints, rollingYears, data.Interval, len(data.DataPoints))
+		return nil, errors.Errorf("insufficient data: need at least %d data points (%d years at %d points/year), got %d",
+			requiredPoints, rollingYears, pointsPerYear, len(data.DataPoints))
 	}
 
 	// Calculate rolling annualized returns
@@ -250,17 +299,24 @@ func (c *YahooClient) CalculateStats(data *HistoricalData, rollingYears int) (*I
 	copy(sorted, rollingReturns)
 	sort.Float64s(sorted)
 
-	// Calculate statistics
+	// Calculate statistics. TotalYears comes from the actual calendar span of
+	// the data (start to end), not from len(points)/pointsPerYear — that
+	// division would inherit any errors in the inferred cadence and is also
+	// less accurate for symbols with irregular gaps.
+	first := data.DataPoints[0].Date
+	last := data.DataPoints[len(data.DataPoints)-1].Date
+	totalYears := last.Sub(first).Hours() / (24 * 365.25)
+
 	stats := &IndexStats{
 		Symbol:             data.Symbol,
-		TotalYears:         float64(len(data.DataPoints)) / float64(pointsPerYear),
+		TotalYears:         totalYears,
 		AnnualizedReturn:   percentile(sorted, 50), // Median
 		Percentile5Return:  percentile(sorted, 5),
 		Percentile95Return: percentile(sorted, 95),
 		StandardDeviation:  standardDeviation(rollingReturns),
 		RollingReturns:     rollingReturns,
-		DataStartDate:      data.DataPoints[0].Date,
-		DataEndDate:        data.DataPoints[len(data.DataPoints)-1].Date,
+		DataStartDate:      first,
+		DataEndDate:        last,
 		CalculatedAt:       time.Now(),
 	}
 

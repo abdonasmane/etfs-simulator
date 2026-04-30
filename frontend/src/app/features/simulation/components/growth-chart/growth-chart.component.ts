@@ -6,13 +6,15 @@ import {
   ElementRef,
   ViewChild,
   AfterViewInit,
+  HostListener,
   inject,
   effect,
+  signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Chart, registerables } from 'chart.js';
+import { Chart, ChartConfiguration, ChartDataset, registerables } from 'chart.js';
 
-import { MonthProjection } from '../../../../core/models';
+import { DailyPoint, MonthProjection } from '../../../../core/models';
 import { ThemeService } from '../../../../core/services';
 
 // Register Chart.js components
@@ -22,25 +24,99 @@ Chart.register(...registerables);
 export interface CompareSeries {
   /** Display label (typically the ETF symbol). */
   label: string;
-  /** Projection points for this ETF, same shape as the primary input. */
+  /** Monthly projection fallback. */
   projections: MonthProjection[];
+  /**
+   * Optional daily points. When present (What If mode), the chart renders the
+   * comparison line at full daily resolution alongside the primary line.
+   */
+  dailyPoints?: DailyPoint[];
 }
 
 /**
- * Interactive area chart showing portfolio growth over time.
- * Similar to iShares savings calculator visualization.
+ * Interactive growth chart with daily-resolution rendering when daily points
+ * are supplied (What If mode), monthly otherwise. Includes a fullscreen zoom
+ * modal triggered by the expand icon — useful for inspecting long-window
+ * simulations where ~4,000 daily points compress into a small inline canvas.
  */
 @Component({
   selector: 'app-growth-chart',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div class="chart-container">
-      <canvas #chartCanvas></canvas>
+    <div class="chart-shell">
+      <button
+        type="button"
+        class="zoom-btn"
+        (click)="openZoom()"
+        aria-label="Expand chart"
+        title="Expand chart"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      </button>
+      <div class="chart-container">
+        <canvas #chartCanvas></canvas>
+      </div>
     </div>
+
+    @if (isZoomed()) {
+      <div
+        class="zoom-overlay"
+        (click)="onOverlayClick($event)"
+        (keydown.escape)="closeZoom()"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Expanded chart — press Escape or click outside to close"
+        tabindex="0"
+      >
+        <div class="zoom-frame">
+          <button
+            type="button"
+            class="zoom-close-btn"
+            (click)="closeZoom()"
+            aria-label="Close expanded chart"
+          >
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+          <div class="zoom-canvas-wrap">
+            <canvas #zoomCanvas></canvas>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [
     `
+      .chart-shell {
+        position: relative;
+      }
+
       .chart-container {
         position: relative;
         width: 100%;
@@ -53,11 +129,137 @@ export interface CompareSeries {
           background-color 0.25s ease,
           border-color 0.25s ease;
       }
+
+      .zoom-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        z-index: 2;
+        width: 28px;
+        height: 28px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text-muted);
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          color 0.15s ease,
+          background 0.15s ease,
+          border-color 0.15s ease,
+          transform 0.15s ease;
+        padding: 0;
+      }
+
+      .zoom-btn:hover {
+        color: var(--color-accent);
+        border-color: var(--color-accent);
+        background: var(--color-accent-light);
+        transform: translateY(-1px);
+      }
+
+      .zoom-btn:active {
+        transform: translateY(0);
+      }
+
+      /* ---- Fullscreen zoom modal ---- */
+      .zoom-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(9, 9, 11, 0.72);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 3rem 2rem;
+        animation: zoomFadeIn 0.18s ease-out;
+      }
+
+      .zoom-frame {
+        position: relative;
+        width: min(1280px, 96vw);
+        height: min(800px, 88vh);
+        background: var(--color-bg-secondary);
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+        box-shadow:
+          0 24px 64px rgba(0, 0, 0, 0.45),
+          0 4px 16px rgba(0, 0, 0, 0.3);
+        padding: 1.5rem 1.5rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        animation: zoomScaleIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .zoom-close-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        z-index: 10;
+        width: 24px;
+        height: 24px;
+        border: 1px solid var(--color-border);
+        background: var(--color-bg-secondary);
+        color: var(--color-text-muted);
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          color 0.15s ease,
+          background 0.15s ease,
+          border-color 0.15s ease;
+        padding: 0;
+      }
+
+      .zoom-close-btn:hover {
+        color: var(--color-text-primary);
+        background: var(--color-bg-tertiary);
+        border-color: var(--color-border-strong);
+      }
+
+      .zoom-canvas-wrap {
+        flex: 1;
+        min-height: 0;
+        position: relative;
+      }
+
+      @keyframes zoomFadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes zoomScaleIn {
+        from {
+          opacity: 0;
+          transform: scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
     `,
   ],
 })
 export class GrowthChartComponent implements AfterViewInit, OnChanges {
   @Input({ required: true }) projections!: MonthProjection[];
+
+  /**
+   * High-resolution daily portfolio snapshots. When non-empty, the chart
+   * renders one point per trading day instead of one per month — captures
+   * intra-month volatility properly. Empty falls back to projections.
+   */
+  @Input() dailyPoints: DailyPoint[] = [];
 
   /** When true, renders chart in historical amber/gold color scheme */
   @Input() isHistorical = false;
@@ -67,26 +269,35 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
 
   /**
    * Optional second projection series for ETF-vs-ETF comparison. When set,
-   * the chart hides the "Total Contributed" line (it's identical for both
-   * sides — comparing returns is the point) and renders both series with
-   * distinct colors.
+   * the "Total Contributed" line is hidden (identical between sides — adds
+   * noise) and both portfolio lines render in distinct colors.
    */
   @Input() compareSeries: CompareSeries | null = null;
 
   @ViewChild('chartCanvas') chartCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('zoomCanvas') zoomCanvas?: ElementRef<HTMLCanvasElement>;
+
+  /** Modal open/closed state. */
+  readonly isZoomed = signal(false);
 
   private readonly themeService = inject(ThemeService);
   private chart: Chart | null = null;
+  private zoomChart: Chart | null = null;
 
   constructor() {
-    // Recreate chart when theme changes
+    // Recreate the inline chart on theme changes.
     effect(() => {
-      // Access the signal to subscribe to changes
       this.themeService.theme();
       if (this.chart && this.chartCanvas?.nativeElement) {
         this.chart.destroy();
         this.chart = null;
         this.createChart();
+      }
+      // Also rebuild the zoom chart while it's open.
+      if (this.zoomChart && this.zoomCanvas?.nativeElement) {
+        this.zoomChart.destroy();
+        this.zoomChart = null;
+        this.createZoomChart();
       }
     });
   }
@@ -98,12 +309,62 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     const relevant =
       changes['projections'] ||
+      changes['dailyPoints'] ||
       changes['isHistorical'] ||
       changes['compareSeries'] ||
       changes['primaryLabel'];
     if (relevant && this.chart) {
       this.updateChart();
     }
+    if (relevant && this.zoomChart) {
+      // Rebuild the zoom chart on data changes too — its canvas dimensions
+      // are different so a fresh build is cleaner than mutating in place.
+      this.zoomChart.destroy();
+      this.zoomChart = null;
+      this.createZoomChart();
+    }
+  }
+
+  /** Open the fullscreen zoom modal and instantiate its chart. */
+  openZoom(): void {
+    if (this.isZoomed()) return;
+    this.isZoomed.set(true);
+    // Wait for the modal's open animation to finish before instantiating
+    // the chart. While the modal is animating (`zoomScaleIn`, 220ms),
+    // CSS `transform: scale()` makes getBoundingClientRect() report
+    // animation-time-scaled dimensions. Chart.js measures during creation,
+    // so creating mid-animation locks it to ~96% of the final size; the
+    // chart then visually "grows" the first time the user hovers (Chart.js
+    // re-measures at full size during a hover redraw). Waiting past the
+    // animation duration ensures we measure final dimensions on the first
+    // shot. 240ms = 220ms animation + 20ms slack.
+    window.setTimeout(() => this.createZoomChart(), 240);
+  }
+
+  /** Close the fullscreen zoom modal and tear down its chart. */
+  closeZoom(): void {
+    if (!this.isZoomed()) return;
+    if (this.zoomChart) {
+      this.zoomChart.destroy();
+      this.zoomChart = null;
+    }
+    this.isZoomed.set(false);
+  }
+
+  /**
+   * Backdrop-click handler. Closes the modal only when the click landed
+   * directly on the overlay (not on the inner frame) — that way clicks on
+   * the chart, axis labels, or close button don't propagate-close.
+   */
+  onOverlayClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.closeZoom();
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    if (this.isZoomed()) this.closeZoom();
   }
 
   /** Get theme-aware colors */
@@ -154,25 +415,50 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     if (!this.chartCanvas?.nativeElement || !this.projections?.length) {
       return;
     }
-
     const ctx = this.chartCanvas.nativeElement.getContext('2d');
     if (!ctx) return;
+    this.chart = new Chart(ctx, this.buildConfig(ctx));
+  }
 
+  private updateChart(): void {
+    if (!this.chart) {
+      this.createChart();
+      return;
+    }
+    const ctx = this.chartCanvas.nativeElement.getContext('2d');
+    if (!ctx) return;
+    const config = this.buildConfig(ctx);
+    this.chart.data.labels = config.data.labels;
+    this.chart.data.datasets = config.data.datasets;
+    this.chart.update('none');
+  }
+
+  private createZoomChart(): void {
+    if (!this.zoomCanvas?.nativeElement || !this.projections?.length) return;
+    const ctx = this.zoomCanvas.nativeElement.getContext('2d');
+    if (!ctx) return;
+    this.zoomChart = new Chart(ctx, this.buildConfig(ctx));
+  }
+
+  /**
+   * Build a complete Chart.js configuration. Used for both the inline chart
+   * and the zoom-modal chart so styling stays in lockstep.
+   */
+  private buildConfig(ctx: CanvasRenderingContext2D): ChartConfiguration<'line'> {
     const data = this.getChartData();
     const datasets = this.buildDatasets(ctx, data);
-
     const colors = this.colors;
-
-    this.chart = new Chart(ctx, {
+    return {
       type: 'line',
-      data: {
-        labels: data.labels,
-        datasets,
-      },
+      data: { labels: data.labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         devicePixelRatio: Math.max(window.devicePixelRatio || 1, 2),
+        // Same draw-in animation across all modes for visual consistency.
+        // Daily mode renders ~4k points so we tighten the duration so it
+        // doesn't feel sluggish; monthly modes use Chart.js's default.
+        animation: this.usingDaily ? { duration: 500, easing: 'easeOutQuart' } : undefined,
         interaction: {
           mode: 'index',
           intersect: false,
@@ -227,14 +513,12 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
         scales: {
           x: {
             display: true,
-            grid: {
-              display: false,
-            },
-            border: {
-              color: colors.grid,
-            },
+            grid: { display: false },
+            border: { color: colors.grid },
             ticks: {
               maxTicksLimit: 8,
+              autoSkip: true,
+              maxRotation: 0,
               font: {
                 size: 10,
                 family: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -244,13 +528,8 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
           },
           y: {
             display: true,
-            grid: {
-              color: colors.grid,
-              tickLength: 0,
-            },
-            border: {
-              display: false,
-            },
+            grid: { color: colors.grid, tickLength: 0 },
+            border: { display: false },
             ticks: {
               callback: (value): string =>
                 `€${Number(value).toLocaleString('de-DE', { notation: 'compact' })}`,
@@ -264,47 +543,26 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
           },
         },
       },
-    });
-  }
-
-  private updateChart(): void {
-    if (!this.chart) {
-      this.createChart();
-      return;
-    }
-
-    const ctx = this.chartCanvas.nativeElement.getContext('2d');
-    if (!ctx) return;
-
-    const data = this.getChartData();
-    const datasets = this.buildDatasets(ctx, data);
-
-    this.chart.data.labels = data.labels;
-    this.chart.data.datasets = datasets;
-    this.chart.update('none');
+    };
   }
 
   /**
-   * Build chart datasets, including range area if available.
+   * Build chart datasets. Layout precedence:
+   *   1. range area (pessimistic/optimistic) when present
+   *   2. comparison series — two portfolio lines, no fills (overlay-readable)
+   *   3. otherwise: single portfolio line + filled "Total Contributed"
    *
-   * Layout precedence:
-   *   1. range area (pessimistic/optimistic) when present — drawn first so the
-   *      median line sits on top.
-   *   2. comparison series when present — two portfolio-value lines, no fills
-   *      (fills occlude each other; better to read as overlay).
-   *   3. otherwise: single portfolio line + filled "Total Contributed".
-   *
-   * When comparing, we omit the contributions line: contributions are
-   * identical between both sides (same form inputs), so it adds noise without
-   * helping the comparison.
+   * In daily mode point markers are disabled (4000+ dots clutter); only
+   * hover surfaces a marker. Borders are slightly thinner.
    */
   private buildDatasets(
     ctx: CanvasRenderingContext2D,
     data: ReturnType<typeof this.getChartData>
-  ): Chart['data']['datasets'] {
-    const datasets: Chart['data']['datasets'] = [];
+  ): ChartDataset<'line'>[] {
+    const datasets: ChartDataset<'line'>[] = [];
     const colors = this.colors;
     const isDark = this.themeService.isDark();
+    const daily = this.usingDaily;
 
     if (this.compareSeries) {
       const primaryLabel = this.primaryLabel ?? 'Primary';
@@ -314,13 +572,13 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
         borderColor: colors.accent,
         backgroundColor: 'transparent',
         fill: false,
-        tension: 0.4,
+        tension: daily ? 0.05 : 0.4,
         pointRadius: 0,
         pointHoverRadius: 6,
         pointHoverBackgroundColor: colors.accent,
         pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
         pointHoverBorderWidth: 2,
-        borderWidth: 2.5,
+        borderWidth: daily ? 1.5 : 2.5,
       });
 
       datasets.push({
@@ -329,13 +587,13 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
         borderColor: colors.compare,
         backgroundColor: 'transparent',
         fill: false,
-        tension: 0.4,
+        tension: daily ? 0.05 : 0.4,
         pointRadius: 0,
         pointHoverRadius: 6,
         pointHoverBackgroundColor: colors.compare,
         pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
         pointHoverBorderWidth: 2,
-        borderWidth: 2.5,
+        borderWidth: daily ? 1.5 : 2.5,
       });
 
       datasets.push({
@@ -344,7 +602,7 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
         borderColor: colors.contributed,
         backgroundColor: 'transparent',
         fill: false,
-        tension: 0.4,
+        tension: daily ? 0 : 0.4,
         pointRadius: 0,
         pointHoverRadius: 6,
         borderWidth: 1.5,
@@ -392,30 +650,31 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       borderColor: colors.accent,
       backgroundColor: this.hasRangeData
         ? 'transparent'
-        : this.createGradient(ctx, colors.accent, 0.3),
+        : this.createGradient(ctx, colors.accent, daily ? 0.18 : 0.3),
       fill: !this.hasRangeData,
-      tension: 0.4,
+      tension: daily ? 0.05 : 0.4,
       pointRadius: 0,
       pointHoverRadius: 6,
       pointHoverBackgroundColor: colors.accent,
       pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
       pointHoverBorderWidth: 2,
-      borderWidth: 2.5,
+      borderWidth: daily ? 1.6 : 2.5,
     });
 
     datasets.push({
       label: 'Total Contributed',
       data: data.contributions,
       borderColor: colors.contributed,
-      backgroundColor: this.createGradient(ctx, colors.contributed, 0.15),
-      fill: true,
-      tension: 0.4,
+      backgroundColor: this.createGradient(ctx, colors.contributed, daily ? 0.08 : 0.15),
+      fill: !daily,
+      tension: daily ? 0 : 0.4,
       pointRadius: 0,
       pointHoverRadius: 6,
       pointHoverBackgroundColor: colors.contributed,
       pointHoverBorderColor: isDark ? '#1e293b' : '#ffffff',
       pointHoverBorderWidth: 2,
       borderDash: [5, 5],
+      borderWidth: daily ? 1.2 : 2,
     });
 
     return datasets;
@@ -428,6 +687,11 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     return this.projections?.length > 0 && this.projections[0].pessimisticValue !== undefined;
   }
 
+  /** True when we're rendering the chart from daily points (vs monthly). */
+  private get usingDaily(): boolean {
+    return this.dailyPoints.length > 0;
+  }
+
   private getChartData(): {
     labels: string[];
     portfolioValues: number[];
@@ -436,10 +700,51 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     optimisticValues?: number[];
     compareValues?: number[];
   } {
+    if (this.usingDaily) {
+      return this.getDailyChartData();
+    }
+    return this.getMonthlyChartData();
+  }
+
+  /**
+   * Build chart series from daily points — one entry per trading day. Compare
+   * mode aligns the secondary side by date string; days only one side has
+   * (rare with major ETFs but possible at LSE/NYSE holiday gaps) get the
+   * carry-forward value from the most recent shared day.
+   */
+  private getDailyChartData(): ReturnType<typeof this.getChartData> {
+    const primary = this.dailyPoints;
+    const labels = primary.map(p => this.formatDailyLabel(p.date));
+    const portfolioValues = primary.map(p => p.portfolioValue);
+    const contributions = primary.map(p => p.totalContributed);
+
+    const data: ReturnType<typeof this.getChartData> = {
+      labels,
+      portfolioValues,
+      contributions,
+    };
+
+    if (this.compareSeries?.dailyPoints?.length) {
+      const secByDate = new Map<string, number>();
+      for (const p of this.compareSeries.dailyPoints) {
+        secByDate.set(p.date, p.portfolioValue);
+      }
+      let lastSeen = secByDate.get(primary[0].date) ?? 0;
+      data.compareValues = primary.map(p => {
+        const v = secByDate.get(p.date);
+        if (v !== undefined) lastSeen = v;
+        return lastSeen;
+      });
+    }
+
+    return data;
+  }
+
+  private getMonthlyChartData(): ReturnType<typeof this.getChartData> {
     const sampledProjections = this.sampleProjections(this.projections);
 
     const data: ReturnType<typeof this.getChartData> = {
-      labels: sampledProjections.map(p => this.formatDate(p.year, p.month)),
+      labels: sampledProjections.map(p => this.formatMonthLabel(p.year, p.month)),
       portfolioValues: sampledProjections.map(p => p.portfolioValue),
       contributions: sampledProjections.map(p => p.totalContributed),
     };
@@ -449,9 +754,6 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       data.optimisticValues = sampledProjections.map(p => p.optimisticValue!);
     }
 
-    // Sample the comparison series with the same step to keep both lines
-    // aligned on the x-axis, then truncate to whichever side is shorter (a
-    // missing leading Yahoo bar can shift one ETF by a month).
     if (this.compareSeries) {
       const sampledCompare = this.sampleProjections(this.compareSeries.projections);
       const len = Math.min(sampledProjections.length, sampledCompare.length);
@@ -464,17 +766,32 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
     return data;
   }
 
+  /**
+   * Down-sample monthly projections for cleaner long-window charts.
+   *
+   * Both endpoints (index 0 and index length-1) are always included, and the
+   * remaining samples are spaced evenly between them. The previous "every Nth
+   * index, plus the last" strategy left an irregular FINAL gap (e.g. for a
+   * 240-month sim with N=6, sampled indices ended …, 234, 239 — a 5-month
+   * gap rendered at the same X-distance as every prior 6-month gap, which
+   * visually looked like the curve "went flat" in the last segment).
+   * Even-spacing eliminates the artifact.
+   */
   private sampleProjections(projections: MonthProjection[]): MonthProjection[] {
-    if (projections.length <= 24) {
-      return projections;
-    } else if (projections.length <= 60) {
-      return projections.filter((_, i) => i % 3 === 0 || i === projections.length - 1);
-    } else {
-      return projections.filter((_, i) => i % 6 === 0 || i === projections.length - 1);
+    const total = projections.length;
+    if (total <= 24) return projections;
+
+    const step = total <= 60 ? 3 : 6;
+    const targetCount = Math.max(2, Math.floor((total - 1) / step) + 1);
+    const last = total - 1;
+    const indices = new Set<number>();
+    for (let k = 0; k < targetCount; k++) {
+      indices.add(Math.round((k * last) / (targetCount - 1)));
     }
+    return projections.filter((_, i) => indices.has(i));
   }
 
-  private formatDate(year: number, month: number): string {
+  private formatMonthLabel(year: number, month: number): string {
     const monthNames = [
       'Jan',
       'Feb',
@@ -490,6 +807,32 @@ export class GrowthChartComponent implements AfterViewInit, OnChanges {
       'Dec',
     ];
     return `${monthNames[month - 1]} ${year}`;
+  }
+
+  /**
+   * Format a "YYYY-MM-DD" date string for the daily X-axis. We show the day
+   * in the tooltip (Chart.js renders the full label string on hover) but
+   * autoSkip + maxTicksLimit keeps the visible axis sparse — only every Nth
+   * label is drawn, so daily granularity reads as a smooth time axis without
+   * clutter.
+   */
+  private formatDailyLabel(date: string): string {
+    const monthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    const [y, m, d] = date.split('-');
+    return `${monthNames[Number(m) - 1]} ${Number(d)}, ${y}`;
   }
 
   private createGradient(
