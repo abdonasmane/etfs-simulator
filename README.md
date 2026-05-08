@@ -1,147 +1,145 @@
-# ETFs Investment Simulator
+# ETF Simulator
 
-A web application that simulates long-term investment growth using **real historical market data**. Unlike simple compound interest calculators, this tool provides realistic projections with confidence ranges based on actual ETF performance.
+Investment growth calculator using real historical data from Yahoo Finance. Supports forward projections with statistical confidence ranges and historical replay ("what if I had invested in SPY since 2010?").
 
-## Why This Tool?
+![ETF Simulator Screenshot](./docs/screenshot.png)
 
-Most investment calculators use a fixed return rate (e.g., 7%), which doesn't reflect market reality. This simulator:
+---
 
-- Uses **historical data from Yahoo Finance** to calculate realistic return expectations
-- Shows **pessimistic, median, and optimistic scenarios** based on 20-year rolling returns
-- Supports **portfolio diversification** across multiple ETFs
-- Models **contribution growth** over time (salary increases, inflation adjustments)
-- Provides **month-by-month projections** with interactive visualizations
+## Features
+
+Three simulation modes:
+
+- **By Duration** — project growth over N years with pessimistic/median/optimistic ranges based on 20-year rolling returns
+- **By Target Date** — simulate until a specific date
+- **What If (Historical)** — replay a strategy on real daily prices from a chosen start date
+
+Other things it does:
+
+- ETF comparison — run two ETFs side by side on the same contributions
+- Custom portfolio — mix multiple ETFs with custom weights
+- Contribution growth — fixed annual increase in € or percentage
+- Today's € toggle — deflate projections to today's purchasing power (Fisher equation, 2.5% default)
+- Shareable URLs — full simulation state encoded in the URL, including the inflation toggle
+- Zoomable chart — click to expand with full daily resolution in What If mode
+- Dark / light theme
+
+**11 supported ETFs** including UCITS-wrapped and Shariah-compliant options:
+
+| Symbol | Name |
+|--------|------|
+| SPY | S&P 500 |
+| QQQ | NASDAQ 100 |
+| EFA | MSCI EAFE (Developed ex-US) |
+| EEM | MSCI Emerging Markets |
+| VT | Vanguard Total World |
+| VWCE.DE | Vanguard FTSE All-World (UCITS) |
+| CSPX.L | iShares Core S&P 500 (UCITS) |
+| IWDA.L | iShares Core MSCI World (UCITS) |
+| IGDA.L | iShares MSCI World Islamic (UCITS, Shariah) |
+| AGG | US Aggregate Bond |
+| GLD | Gold |
+
+---
 
 ## Quick Start
 
-### Docker (Recommended)
-
-**Prerequisites:** Docker and Docker Compose
+### Docker (recommended)
 
 ```bash
 docker-compose up --build
 ```
 
-Then open:
-- **Frontend:** http://localhost:4200
-- **Backend API:** http://localhost:8080
-- **Swagger Docs:** http://localhost:8080/swagger/index.html
+- Frontend: http://localhost:4200
+- Backend API: http://localhost:8080
+- Swagger: http://localhost:8080/swagger/index.html
 
 ### Local Development
 
-#### Backend (Go)
-
-**Prerequisites:** Go 1.24+
+**Backend (Go 1.25+)**
 
 ```bash
 cd backend
-make setup  # Install CLI tools (first time only)
-make run    # Start server on :8080
+make setup   # install tools (first time only)
+make run     # start API on :8080
 ```
 
-#### Frontend (Angular)
-
-**Prerequisites:** Node.js 22+
+**Frontend (Node 22+)**
 
 ```bash
 cd frontend
-npm install  # Install dependencies
-npm start    # Start dev server on :4200
+npm install
+npm start    # start dev server on :4200
 ```
+
+---
 
 ## How It Works
 
-### The Simulation Engine
+### Statistical projections (By Duration / By Target Date)
 
-The simulator performs month-by-month compound growth calculations:
+On startup the backend fetches full price history for every ETF and computes rolling annualized returns (20-year window, 10-year fallback). The **5th / 50th / 95th percentiles** become the pessimistic, median, and optimistic return rates fed into the month-by-month simulation engine.
 
 ```
 For each month:
-  1. Apply investment returns: balance *= (1 + monthlyReturnRate)
-  2. Add contribution: balance += currentContribution
-  3. Grow contribution (if growth rate set): contribution *= (1 + monthlyGrowthRate)
+  balance  *= (1 + monthlyReturnRate)
+  balance  += currentContribution
+  contribution grows by rate or fixed amount at year boundaries
 ```
 
-### Historical Return Calculation
+### Historical replay (What If)
 
-On startup, the backend fetches historical monthly prices from Yahoo Finance and calculates:
+The backend fetches daily prices, walks every trading day, applies your contribution on the first trading day of each month, and emits both a `DailyPoint[]` array (for the chart) and monthly snapshots (for the table). The result is a pixel-perfect replay of what your portfolio would have done.
 
-| Metric | Description | Use Case |
-|--------|-------------|----------|
-| **Median Return** | 50th percentile of 20-year rolling returns | Expected scenario |
-| **Pessimistic** | 5th percentile | Worst-case planning |
-| **Optimistic** | 95th percentile | Best-case scenario |
+### Inflation adjustment
 
-### Supported ETFs
+Toggling **Today's €** applies the Fisher equation to annualized return and deflates all future values and inflates all past values to present purchasing power:
 
-| Symbol | Name | Median Return* | Description |
-|--------|------|----------------|-------------|
-| SPY | S&P 500 | ~8.7% | 500 largest US companies |
-| QQQ | NASDAQ 100 | ~13.6% | 100 largest non-financial NASDAQ companies |
-| EFA | MSCI EAFE | ~5.7% | Developed markets excluding US & Canada |
+```
+real_rate = (1 + nominal) / (1 + inflation) − 1
+```
 
-*Returns are calculated dynamically from historical data and may vary.
+The share URL encodes `real=1` so recipients see the same view you shared.
+
+---
 
 ## Architecture
 
 ```
-┌─────────────────────┐         HTTP          ┌─────────────────────────────────┐
-│                     │ ◄───────────────────► │                                 │
-│   Angular 21 SPA    │                       │         Go REST API             │
-│   (Port 4200)       │                       │         (Port 8080)             │
-│                     │                       │                                 │
-│  • Simulation Form  │                       │  • Yahoo Finance Client         │
-│  • Portfolio Builder│                       │  • Statistical Analysis         │
-│  • Growth Chart     │                       │  • Simulation Engine            │
-│  • Results Display  │                       │  • Prometheus Metrics           │
-│                     │                       │                                 │
-└─────────────────────┘                       └───────────────┬─────────────────┘
-                                                              │
-                                                              ▼
-                                              ┌───────────────────────────────┐
-                                              │     Yahoo Finance API         │
-                                              │   (Historical price data)     │
-                                              └───────────────────────────────┘
+┌──────────────────────┐    HTTP    ┌──────────────────────────────┐
+│   Angular 21 SPA     │ ◄────────► │        Go REST API           │
+│   (Port 4200)        │            │        (Port 8080)           │
+│                      │            │                              │
+│  Simulation Form     │            │  Yahoo Finance Client        │
+│  Portfolio Builder   │            │  Rolling-return statistics   │
+│  Growth Chart        │            │  Historical simulation       │
+│  Results + Comparison│            │  Prometheus metrics          │
+└──────────────────────┘            └──────────────┬───────────────┘
+                                                   │
+                                                   ▼
+                                    ┌──────────────────────────┐
+                                    │   Yahoo Finance API      │
+                                    │   (daily price data)     │
+                                    └──────────────────────────┘
 ```
 
-## Project Structure
+Production runs on **Google Cloud Run** with CI/CD via **Cloud Build** (auto-deploy on push to `main`).
 
-```
-├── backend/                    # Go API server
-│   ├── cmd/api/                # Application entry point
-│   ├── internal/
-│   │   ├── config/             # Configuration loading
-│   │   ├── handler/            # HTTP handlers & simulation logic
-│   │   ├── marketdata/         # Yahoo Finance client & statistics
-│   │   ├── metrics/            # Prometheus metrics
-│   │   └── server/             # HTTP server setup
-│   └── sdk/                    # Shared utilities (errors, logger)
-│
-├── frontend/                   # Angular 21 SPA
-│   └── src/app/
-│       ├── core/               # Services and models
-│       ├── features/           # Feature modules (simulation)
-│       └── shared/             # Reusable components
-│
-└── docker-compose.yml          # Container orchestration
-```
+---
 
 ## API Reference
-
-### Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/api/v1/indexes` | List available ETFs with statistics |
-| `POST` | `/api/v1/simulate/years` | Simulate by number of years |
-| `POST` | `/api/v1/simulate/target` | Simulate until target date |
+| `GET` | `/api/v1/indexes` | ETFs with live rolling-return stats |
+| `POST` | `/api/v1/simulate/years` | Project by number of years |
+| `POST` | `/api/v1/simulate/target` | Project to a target date |
+| `POST` | `/api/v1/simulate/historical` | Replay real historical returns |
 | `GET` | `/metrics` | Prometheus metrics |
-| `GET` | `/swagger/index.html` | Interactive API documentation |
+| `GET` | `/swagger/index.html` | Interactive API docs |
 
-### Example: Simulate by Years
-
-**Request:**
+### Simulate by years
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/simulate/years \
@@ -155,36 +153,7 @@ curl -X POST http://localhost:8080/api/v1/simulate/years \
   }'
 ```
 
-**Response (abbreviated):**
-
-```json
-{
-  "inputs": { ... },
-  "projections": [
-    {
-      "year": 2026,
-      "month": 2,
-      "monthlyContribution": 500,
-      "totalContributed": 10500,
-      "portfolioValue": 10572.35,
-      "pessimisticValue": 10545.20,
-      "optimisticValue": 10612.80
-    }
-  ],
-  "summary": {
-    "targetDate": "January 2046",
-    "finalValue": 425680.50,
-    "totalContributed": 165420.00,
-    "totalGain": 260260.50,
-    "percentageGain": 157.3,
-    "hasRange": true,
-    "pessimisticValue": 285420.00,
-    "optimisticValue": 720350.00
-  }
-}
-```
-
-### Example: Custom Portfolio
+### Custom portfolio
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/simulate/years \
@@ -201,24 +170,67 @@ curl -X POST http://localhost:8080/api/v1/simulate/years \
   }'
 ```
 
+### Historical replay
+
+```bash
+curl -X POST http://localhost:8080/api/v1/simulate/historical \
+  -H "Content-Type: application/json" \
+  -d '{
+    "initialInvestment": 10000,
+    "monthlyContribution": 500,
+    "startYear": 2015,
+    "startMonth": 1,
+    "indexSymbol": "VWCE.DE"
+  }'
+```
+
+---
+
+## Project Structure
+
+```
+├── backend/
+│   ├── cmd/api/            Entry point
+│   ├── internal/
+│   │   ├── config/         Env-driven config
+│   │   ├── handler/        HTTP handlers + simulation engine
+│   │   ├── marketdata/     Yahoo Finance client + IndexService
+│   │   ├── metrics/        Prometheus middleware
+│   │   └── server/         HTTP server + graceful shutdown
+│   └── sdk/                errors, logger
+│
+├── frontend/
+│   └── src/app/
+│       ├── core/           Models + services (ApiService, ThemeService)
+│       ├── features/       SimulationPage, form, results, chart, comparison
+│       └── shared/         CustomSelect, PortfolioAllocator, ThemeToggle
+│
+├── infra/                  Terraform (Cloud Run + Artifact Registry)
+├── docs/                   Screenshots
+└── docker-compose.yml
+```
+
+---
+
 ## Configuration
 
-### Environment Variables
+### Backend environment variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENV` | `development` | Environment (`development` or `production`) |
-| `SERVER_HOST` | `localhost` | Server bind address |
-| `SERVER_PORT` | `8080` | Server port |
+| `APP_ENV` | `development` | `development` / `staging` / `production` |
+| `SERVER_HOST` | `0.0.0.0` | Bind address |
+| `SERVER_PORT` | `8080` | Port |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated allowlist or `*` |
 
-### Frontend Environment
+### Frontend runtime config
 
-Edit `frontend/src/environments/environment.ts`:
+`frontend/src/assets/config.json` is loaded at boot — set `apiUrl` here. In Docker, `config.json.template` is populated by `envsubst` from `$API_URL`.
 
-```typescript
-export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:8080'
-};
-```
+---
 
+## Adding a new ETF
+
+1. Append to `DefaultSupportedIndexes` in `backend/internal/marketdata/indexservice.go`
+2. Mirror it in `returnOptions` in `frontend/src/app/features/simulation/components/simulation-form/simulation-form.component.ts`
+3. Deploy — the backend fetches history automatically on startup
